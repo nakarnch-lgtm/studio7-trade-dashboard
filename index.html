@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Studio7 Zone ตี๋ — Trade In Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        gold:   { DEFAULT:'#C8A96B', light:'#F5E9CE', dark:'#9E7A3F' },
+        forest: { DEFAULT:'#1F3B2D', light:'#2D5A40' },
+      },
+      backgroundImage: { page:'linear-gradient(135deg,#E0F2F1 0%,#E3F2FD 45%,#FFFDE7 100%)' },
+      boxShadow: {
+        card:    '0 2px 20px rgba(31,59,45,.07),0 1px 4px rgba(0,0,0,.04)',
+        'card-lg':'0 8px 40px rgba(31,59,45,.13),0 2px 8px rgba(0,0,0,.06)',
+      },
+    }
+  }
+}
+</script>
+<style>
+select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236B7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+.fill-bar{transition:width .5s cubic-bezier(.4,0,.2,1)}
+.drop-zone.drag-over{border-color:#1F3B2D!important;background:#E8F5EE!important}
+</style>
+</head>
+<body class="bg-page min-h-screen font-sans">
+
+<!-- ===== UPLOAD SCREEN ===== -->
+<div id="upload-screen" class="min-h-screen flex flex-col items-center justify-center px-6 py-12">
+  <div class="mb-10 text-center">
+    <div class="inline-flex items-center gap-3 mb-5">
+      <div class="w-14 h-14 rounded-2xl bg-[#1F3B2D] flex items-center justify-center font-black text-[#C8A96B] text-xl shadow-card">S7</div>
+      <div class="text-left">
+        <div class="text-2xl font-bold text-gray-900">Studio7 Zone ตี๋</div>
+        <div class="text-gray-400 text-sm font-medium">Trade In Dashboard</div>
+      </div>
+    </div>
+    <p class="text-gray-600 text-sm font-medium">อัปโหลดไฟล์ Excel 2 ไฟล์เพื่อเริ่มวิเคราะห์ข้อมูล</p>
+    <div class="mt-2 flex items-center justify-center gap-2 text-xs text-gray-400">
+      <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
+      ประมวลผลในเบราว์เซอร์เท่านั้น · ไม่มีการส่งข้อมูลออก · รีเฟรชเพื่อล้างข้อมูล
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl mb-8">
+    <!-- File 1: Sales -->
+    <div>
+      <div class="flex items-center gap-2 mb-2.5">
+        <span class="w-6 h-6 rounded-full bg-[#1F3B2D] text-white flex items-center justify-center text-xs font-black shrink-0">1</span>
+        <span class="text-xs font-bold text-gray-600 uppercase tracking-wide">ไฟล์ยอดขาย (52_april)</span>
+      </div>
+      <div id="drop-sales"
+        class="drop-zone bg-white rounded-2xl shadow-card border-2 border-dashed border-gray-200 p-8 text-center cursor-pointer transition-all hover:border-[#1F3B2D] hover:bg-[#F5FDF8]"
+        onclick="document.getElementById('input-sales').click()"
+        ondragover="onDragOver(event,'drop-sales')" ondragleave="onDragLeave('drop-sales')" ondrop="onDrop(event,'sales')">
+        <div class="text-4xl mb-3">📊</div>
+        <div class="text-sm font-semibold text-gray-700 mb-1">คลิกหรือลากไฟล์มาวาง</div>
+        <div class="text-xs text-gray-400">ไฟล์ .xlsx ข้อมูลยอดขาย</div>
+        <div id="sales-filename" class="hidden mt-3 text-xs font-semibold text-[#1F3B2D] bg-[#E8F5EE] rounded-xl px-3 py-1.5"></div>
+      </div>
+      <input type="file" id="input-sales" accept=".xlsx,.xls" class="hidden" onchange="onFileSelect(event,'sales')">
+    </div>
+
+    <!-- File 2: Trade -->
+    <div>
+      <div class="flex items-center gap-2 mb-2.5">
+        <span class="w-6 h-6 rounded-full bg-[#C8A96B] text-[#1F3B2D] flex items-center justify-center text-xs font-black shrink-0">2</span>
+        <span class="text-xs font-bold text-gray-600 uppercase tracking-wide">รายงานเทรด (trade_report)</span>
+      </div>
+      <div id="drop-trade"
+        class="drop-zone bg-white rounded-2xl shadow-card border-2 border-dashed border-gray-200 p-8 text-center cursor-pointer transition-all hover:border-[#C8A96B] hover:bg-[#FDF9F0]"
+        onclick="document.getElementById('input-trade').click()"
+        ondragover="onDragOver(event,'drop-trade')" ondragleave="onDragLeave('drop-trade')" ondrop="onDrop(event,'trade')">
+        <div class="text-4xl mb-3">🔄</div>
+        <div class="text-sm font-semibold text-gray-700 mb-1">คลิกหรือลากไฟล์มาวาง</div>
+        <div class="text-xs text-gray-400">ไฟล์ .xlsx ข้อมูลการเทรด</div>
+        <div id="trade-filename" class="hidden mt-3 text-xs font-semibold text-[#9E7A3F] bg-[#FDF6E8] rounded-xl px-3 py-1.5"></div>
+      </div>
+      <input type="file" id="input-trade" accept=".xlsx,.xls" class="hidden" onchange="onFileSelect(event,'trade')">
+    </div>
+  </div>
+
+  <button id="process-btn" onclick="processFiles()"
+    class="hidden bg-[#1F3B2D] hover:bg-[#2D5A40] text-white font-bold px-10 py-3.5 rounded-2xl shadow-card transition-all text-sm">
+    ประมวลผลข้อมูล →
+  </button>
+
+  <div id="upload-error" class="hidden mt-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-5 py-3"></div>
+
+  <div id="loading" class="hidden mt-6 flex flex-col items-center gap-3">
+    <div class="w-8 h-8 border-4 border-[#1F3B2D] border-t-transparent rounded-full animate-spin"></div>
+    <div class="text-sm text-gray-500" id="loading-msg">กำลังประมวลผล…</div>
+  </div>
+</div>
+
+<!-- ===== DASHBOARD SCREEN ===== -->
+<div id="dashboard-screen" class="hidden">
+  <nav class="bg-[#1F3B2D] sticky top-0 z-50 shadow-lg">
+    <div class="max-w-screen-2xl mx-auto px-6 py-3.5 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3 shrink-0">
+        <div class="w-9 h-9 rounded-xl bg-[#C8A96B] flex items-center justify-center font-black text-[#1F3B2D] text-sm">S7</div>
+        <div>
+          <div class="text-white font-bold text-base leading-tight">Studio7 Zone ตี๋</div>
+          <div class="text-white/40 text-xs">Trade In Dashboard</div>
+        </div>
+      </div>
+      <div id="nav-summary" class="flex gap-2 flex-wrap"></div>
+      <button onclick="resetDashboard()"
+        class="shrink-0 text-white/60 hover:text-white text-xs bg-white/10 hover:bg-white/20 rounded-xl px-4 py-2 transition-all">
+        ↩ อัปโหลดใหม่
+      </button>
+    </div>
+  </nav>
+
+  <div class="max-w-screen-2xl mx-auto px-4 py-4">
+    <div class="mb-3">
+      <h1 class="text-xl font-bold text-gray-900">Trade In Performance</h1>
+      <p class="text-gray-500 text-xs mt-0.5">
+        ATT% = <span class="font-semibold text-[#1F3B2D]">จำนวนตกลงเทรด</span>
+        ÷ <span class="font-semibold text-[#C8A96B]">จำนวน Device ที่ขาย</span>
+        &nbsp;· เลือก Device เพื่อปรับการคำนวณ
+      </p>
+    </div>
+
+    <!-- DEVICE FILTER -->
+    <div class="bg-white rounded-xl shadow-card p-3 mb-3">
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="flex items-center gap-2 shrink-0">
+          <div class="w-7 h-7 rounded-lg bg-[#1F3B2D] flex items-center justify-center">
+            <svg class="w-4 h-4 text-[#C8A96B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"/>
+            </svg>
+          </div>
+          <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Device</span>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          <label class="dev-chip flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 cursor-pointer select-none transition-all border-[#1F3B2D] bg-[#E8F5EE]" data-dev="mac">
+            <input type="checkbox" id="dev-mac" checked class="hidden" onchange="onDevChange()">
+            <span>💻</span><span class="dev-label text-sm font-bold text-[#1F3B2D]">Mac</span>
+            <span id="cnt-mac" class="text-xs bg-[#1F3B2D] text-white rounded-full px-1.5 py-0.5 font-semibold min-w-[20px] text-center"></span>
+          </label>
+          <label class="dev-chip flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 cursor-pointer select-none transition-all border-[#1F3B2D] bg-[#E8F5EE]" data-dev="ipad">
+            <input type="checkbox" id="dev-ipad" checked class="hidden" onchange="onDevChange()">
+            <span>🟧</span><span class="dev-label text-sm font-bold text-[#1F3B2D]">iPad</span>
+            <span id="cnt-ipad" class="text-xs bg-[#1F3B2D] text-white rounded-full px-1.5 py-0.5 font-semibold min-w-[20px] text-center"></span>
+          </label>
+          <label class="dev-chip flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 cursor-pointer select-none transition-all border-[#1F3B2D] bg-[#E8F5EE]" data-dev="iphone">
+            <input type="checkbox" id="dev-iphone" checked class="hidden" onchange="onDevChange()">
+            <span>📱</span><span class="dev-label text-sm font-bold text-[#1F3B2D]">iPhone</span>
+            <span id="cnt-iphone" class="text-xs bg-[#1F3B2D] text-white rounded-full px-1.5 py-0.5 font-semibold min-w-[20px] text-center"></span>
+          </label>
+          <label class="dev-chip flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 cursor-pointer select-none transition-all border-[#1F3B2D] bg-[#E8F5EE]" data-dev="watch">
+            <input type="checkbox" id="dev-watch" checked class="hidden" onchange="onDevChange()">
+            <span>⌚</span><span class="dev-label text-sm font-bold text-[#1F3B2D]">Apple Watch</span>
+            <span id="cnt-watch" class="text-xs bg-[#1F3B2D] text-white rounded-full px-1.5 py-0.5 font-semibold min-w-[20px] text-center"></span>
+          </label>
+        </div>
+        <div class="ml-auto flex flex-wrap gap-3 shrink-0">
+          <div class="flex items-center gap-1 text-xs font-semibold text-gray-500"><div class="w-2.5 h-2.5 rounded-sm bg-emerald-400"></div>ตกลงเทรด</div>
+          <div class="flex items-center gap-1 text-xs font-semibold text-gray-500"><div class="w-2.5 h-2.5 rounded-sm bg-red-400"></div>ไม่ตกลง</div>
+          <div class="flex items-center gap-1 text-xs font-semibold text-gray-500"><div class="w-2.5 h-2.5 rounded-sm bg-amber-300"></div>รอ</div>
+          <div class="flex items-center gap-1 text-xs font-semibold text-[#C8A96B]"><div class="w-2.5 h-2.5 rounded-sm bg-[#C8A96B]"></div>ยอดขาย</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB SWITCHER -->
+    <div class="flex items-center gap-2 mb-3 flex-wrap">
+      <button id="tab-summary" onclick="switchView('summary')"
+        class="px-4 py-2 rounded-xl text-sm font-bold transition-all bg-[#1F3B2D] text-white shadow-card">
+        📊 ภาพรวมสาขา
+      </button>
+      <button id="tab-detail" onclick="switchView('detail')"
+        class="px-4 py-2 rounded-xl text-sm font-bold transition-all bg-white text-gray-500 shadow-card hover:text-[#1F3B2D]">
+        🃏 รายละเอียดสาขา
+      </button>
+      <span id="period-badge" class="hidden ml-1 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">📅 เทรดเดือน: <span id="period-label"></span></span>
+    </div>
+
+    <!-- OVERVIEW SUMMARY CARDS (always visible) -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3" id="overview-cards"></div>
+
+    <!-- ===== VIEW: BRANCH SUMMARY TABLE ===== -->
+    <div id="view-summary">
+      <div class="bg-white rounded-xl shadow-card overflow-x-auto">
+        <table class="w-full table-fixed">
+          <thead>
+            <tr class="bg-[#1F3B2D] text-white">
+              <th class="px-1 py-2.5 text-center text-xs font-bold uppercase tracking-wide w-7">#</th>
+              <th class="px-2 py-2.5 text-left text-sm font-bold uppercase tracking-wide">สาขา</th>
+              <th class="px-1 py-2.5 text-center text-xs font-bold uppercase w-11">ตกลง</th>
+              <th class="px-1 py-2.5 text-center text-xs font-bold uppercase w-[66px]">ยอดประเมิน</th>
+              <th class="px-1 py-2.5 text-center text-xs font-bold uppercase w-11">ขาย</th>
+              <th class="px-1 py-2.5 text-center text-xs font-bold uppercase w-[108px]">ATT%</th>
+              <th class="px-2 py-2.5 text-left text-xs font-bold uppercase w-28 hidden md:table-cell">Device (ขาย)</th>
+            </tr>
+          </thead>
+          <tbody id="summary-tbody"></tbody>
+        </table>
+      </div>
+      <div class="mt-2 flex items-center gap-2 text-xs text-gray-400">
+        <div class="w-3 h-3 rounded-sm bg-red-100 border border-red-300"></div>
+        <span>ATT% ต่ำกว่า 15% — ต้องพัฒนา</span>
+      </div>
+    </div>
+
+    <!-- ===== VIEW: DETAIL CARDS ===== -->
+    <div id="view-detail" class="hidden">
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5" id="trade-cards"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== CONSTANTS =====
+const DEV_KEYS   = ['mac','ipad','iphone','watch'];
+const DEV_LABELS = {mac:'Mac',ipad:'iPad',iphone:'iPhone',watch:'Apple Watch'};
+const DEV_ICONS  = {mac:'💻',ipad:'⬛️',iphone:'📱',watch:'⌚'};
+const CAT_DEV    = {'Mac':'mac','iPad':'ipad','iPhone':'iphone','Apple Watch':'watch'};
+const TRADE_DEV  = {'MacBook':'mac','iPad':'ipad','iPhone':'iphone','Apple Watch':'watch','Smart Phone':'smartphone'};
+const BRANCH_COLORS = [
+  {from:'from-[#1F3B2D]',to:'to-[#2D5A40]',icon:'🏪'},
+  {from:'from-[#9E7A3F]',to:'to-[#C8A96B]',icon:'🏬'},
+  {from:'from-[#1e40af]',to:'to-[#3b82f6]',icon:'🛍️'},
+  {from:'from-[#0f766e]',to:'to-[#14b8a6]',icon:'🏢'},
+  {from:'from-[#6d28d9]',to:'to-[#a78bfa]',icon:'🏪'},
+  {from:'from-[#b45309]',to:'to-[#f59e0b]',icon:'🏬'},
+  {from:'from-[#be185d]',to:'to-[#f472b6]',icon:'🛍️'},
+  {from:'from-[#065f46]',to:'to-[#34d399]',icon:'🏢'},
+  {from:'from-[#1e3a8a]',to:'to-[#60a5fa]',icon:'🏪'},
+];
+
+let DATA = null, fileSales = null, fileTrade = null, DATA_MONTHS = '';
+
+// ===== DRAG & DROP =====
+function onDragOver(e,id){ e.preventDefault(); document.getElementById(id).classList.add('drag-over'); }
+function onDragLeave(id) { document.getElementById(id).classList.remove('drag-over'); }
+function onDrop(e,type)  { e.preventDefault(); onDragLeave(type==='sales'?'drop-sales':'drop-trade'); const f=e.dataTransfer.files[0]; if(f) handleFile(f,type); }
+function onFileSelect(e,type){ const f=e.target.files[0]; if(f) handleFile(f,type); }
+
+function handleFile(file, type){
+  if(type==='sales'){ fileSales=file; mark('sales-filename','📊 '+file.name,'text-[#1F3B2D]','bg-[#E8F5EE]'); }
+  else              { fileTrade=file; mark('trade-filename','🔄 '+file.name,'text-[#9E7A3F]','bg-[#FDF6E8]'); }
+  if(fileSales && fileTrade) document.getElementById('process-btn').classList.remove('hidden');
+}
+function mark(id, text, textCls, bgCls){
+  const el=document.getElementById(id);
+  el.textContent=text; el.className=`mt-3 text-xs font-semibold rounded-xl px-3 py-1.5 ${textCls} ${bgCls}`;
+  el.classList.remove('hidden');
+}
+
+// ===== PARSE =====
+function readXlsx(file){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=e=>{ const wb=XLSX.read(e.target.result,{type:'array'}); res(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:null})); };
+    r.onerror=rej; r.readAsArrayBuffer(file);
+  });
+}
+function findCol(sample, candidates){ for(const c of candidates){ if(c in sample) return c; } return candidates[0]; }
+function s(v){ return v!=null?String(v):''; }
+function shortBranch(b){ if(!b)return'Unknown'; return b.includes(': ')?b.split(': ').slice(1).join(': '):b.includes(':')?b.split(':').slice(1).join(':').trim():b; }
+function normBranch(b){ return b.toLowerCase().replace(/studio\s*7/g,'studio7').replace(/b-play/g,'bplay').replace(/[^a-z0-9ก-๙]/g,' ').replace(/\s+/g,' ').trim(); }
+function matchBranch(reportName, salesKeys){
+  const rn=normBranch(reportName);
+  // exact match first
+  for(const k of salesKeys){ if(normBranch(k)===rn)return k; }
+  // contains match
+  for(const k of salesKeys){ const kn=normBranch(k); if(rn.includes(kn)||kn.includes(rn))return k; }
+  return reportName; // fallback — use as-is
+}
+function parseTradeReport(rows){
+  const COL0=Object.keys(rows[0])[0];
+  const COLS=Object.keys(rows[0]);
+  const TOTAL_COL=COLS[COLS.length-1]; // __EMPTY_13 = รวม
+  const MONTH_COLS=COLS.slice(2,14);   // __EMPTY_1...__EMPTY_12 = ม.ค.-ธ.ค.
+  const summary={};
+  // rows[0] = title, rows[1] = header, rows[2..n-4] = data, last 3 = grand total
+  const data=rows.slice(2,rows.length-3);
+  for(let i=0;i<data.length;i+=3){
+    const bRow=data[i], aRow=data[i+1];
+    if(!bRow||!aRow)break;
+    const rawName=String(bRow[COL0]||'').trim();
+    if(!rawName||rawName==='รวมทั้งหมด')break;
+    const branchKey=shortBranch(rawName);
+    const evaluated=Number(bRow[TOTAL_COL])||0;
+    const agreed=Number(aRow[TOTAL_COL])||0;
+    // also store per-month
+    const byMonth={};
+    MONTH_COLS.forEach((c,idx)=>{ byMonth[idx+1]={evaluated:Number(bRow[c])||0,agreed:Number(aRow[c])||0}; });
+    summary[branchKey]={evaluated,agreed,not_agreed:evaluated-agreed,byMonth};
+  }
+  return summary;
+}
+function statusCode(st){
+  if(st==='สิ้นสุดการประเมินราคา')return 1;   // ตกลงเทรด
+  if(st==='ยกเลิกรายการ')return 2;              // ยกเลิกเทรด
+  if(st==='รอผู้ขายยืนยันราคา')return 3;        // รอราคา
+  return 0;
+}
+
+async function processFiles(){
+  const errEl=document.getElementById('upload-error');
+  errEl.classList.add('hidden');
+  document.getElementById('process-btn').classList.add('hidden');
+  document.getElementById('loading').classList.remove('hidden');
+  try{
+    document.getElementById('loading-msg').textContent='กำลังอ่านไฟล์ยอดขาย…';
+    const sRows=await readXlsx(fileSales);
+    document.getElementById('loading-msg').textContent='กำลังอ่านรายงานเทรด…';
+    const tRows=await readXlsx(fileTrade);
+    document.getElementById('loading-msg').textContent='กำลังประมวลผลข้อมูล…';
+
+    const sS=sRows[0]||{};
+    const kBranch=findCol(sS,['Branch (Name)','Branch']);
+    const kCat   =findCol(sS,['Category (Name)','Category']);
+    const kPType =findCol(sS,['Product Type']);
+    const kQty   =findCol(sS,['Number','Qty','Quantity']);
+    const kOff   =findCol(sS,['Officer (ID)','OfficerID']);
+    const kDate  =findCol(sS,['Doc Date','DocDate','Date','วันที่']);
+
+    // Detect which months are present in the sales file
+    const activeMths=new Set();
+    sRows.forEach(r=>{
+      const raw=s(r[kDate]);
+      const m=raw.match(/(\d{2})\/(\d{2})\/\d{4}/);
+      if(m){ const mn=parseInt(m[2]); if(mn>=1&&mn<=12)activeMths.add(mn); }
+    });
+
+    const salesByBranch={}, salesByEmp={};
+    sRows.forEach(r=>{
+      if(r[kPType]!=='Inventory Item')return;
+      const qty=Number(r[kQty])||0; if(qty<=0)return;
+      const branch=shortBranch(s(r[kBranch])); const dev=CAT_DEV[s(r[kCat])]; if(!dev)return;
+      if(!salesByBranch[branch])salesByBranch[branch]={};
+      salesByBranch[branch][dev]=(salesByBranch[branch][dev]||0)+qty;
+      const oid=s(r[kOff]); if(!oid)return;
+      if(!salesByEmp[oid])salesByEmp[oid]={};
+      salesByEmp[oid][dev]=(salesByEmp[oid][dev]||0)+qty;
+    });
+
+    // Parse trade report (3-row-per-branch summary format)
+    const rawSummary=parseTradeReport(tRows);
+    // Reconcile branch names with sales file keys using fuzzy match
+    const salesKeys=Object.keys(salesByBranch);
+    const tradeSummary={};
+    Object.entries(rawSummary).forEach(([rk,v])=>{
+      const matched=matchBranch(rk,salesKeys);
+      tradeSummary[matched]=v;
+    });
+
+    // Filter trade data to only months present in sales file
+    const THAI_MTH=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    if(activeMths.size>0){
+      const mthLabel=[...activeMths].sort((a,b)=>a-b).map(m=>THAI_MTH[m]).join(', ');
+      DATA_MONTHS=mthLabel;
+      Object.values(tradeSummary).forEach(v=>{
+        let e=0,a=0;
+        activeMths.forEach(m=>{ const bm=v.byMonth[m]||{evaluated:0,agreed:0}; e+=bm.evaluated; a+=bm.agreed; });
+        v.evaluated=e; v.agreed=a; v.not_agreed=e-a;
+      });
+    }else{
+      DATA_MONTHS='';
+    }
+
+    DATA={sales_by_branch:salesByBranch,trade_summary:tradeSummary,by_emp:{},sales_by_emp:salesByEmp};
+    showDashboard();
+  }catch(err){
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('process-btn').classList.remove('hidden');
+    errEl.textContent='เกิดข้อผิดพลาด: '+err.message;
+    errEl.classList.remove('hidden');
+    console.error(err);
+  }
+}
+
+function showDashboard(){
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('upload-screen').classList.add('hidden');
+  document.getElementById('dashboard-screen').classList.remove('hidden');
+  document.querySelectorAll('.dev-chip').forEach(chip=>{
+    chip.onclick=function(){ const cb=document.getElementById('dev-'+this.dataset.dev); cb.checked=!cb.checked; onDevChange(); };
+  });
+  // Show period badge if we know which months were matched
+  const badge=document.getElementById('period-badge');
+  const lbl=document.getElementById('period-label');
+  if(DATA_MONTHS){
+    lbl.textContent=DATA_MONTHS;
+    badge.classList.remove('hidden');
+  }else{
+    badge.classList.add('hidden');
+  }
+  updateChips(); render();
+}
+
+function resetDashboard(){
+  DATA=null; fileSales=null; fileTrade=null; DATA_MONTHS='';
+  document.getElementById('dashboard-screen').classList.add('hidden');
+  document.getElementById('upload-screen').classList.remove('hidden');
+  document.getElementById('process-btn').classList.add('hidden');
+  ['input-sales','input-trade'].forEach(id=>{ document.getElementById(id).value=''; });
+  ['sales-filename','trade-filename'].forEach(id=>{ document.getElementById(id).classList.add('hidden'); });
+  DEV_KEYS.forEach(d=>{ document.getElementById('dev-'+d).checked=true; });
+  updateChips();
+}
+
+// ===== TAB VIEW =====
+let currentView = 'summary';
+function switchView(v){
+  currentView = v;
+  const isSummary = v==='summary';
+  document.getElementById('view-summary').classList.toggle('hidden', !isSummary);
+  document.getElementById('view-detail').classList.toggle('hidden', isSummary);
+  const tS=document.getElementById('tab-summary'), tD=document.getElementById('tab-detail');
+  tS.className = isSummary
+    ? 'px-4 py-2 rounded-xl text-sm font-bold transition-all bg-[#1F3B2D] text-white shadow-card'
+    : 'px-4 py-2 rounded-xl text-sm font-bold transition-all bg-white text-gray-500 shadow-card hover:text-[#1F3B2D]';
+  tD.className = !isSummary
+    ? 'px-4 py-2 rounded-xl text-sm font-bold transition-all bg-[#1F3B2D] text-white shadow-card'
+    : 'px-4 py-2 rounded-xl text-sm font-bold transition-all bg-white text-gray-500 shadow-card hover:text-[#1F3B2D]';
+}
+
+function renderSummary(sorted, devs){
+  const tbody = document.getElementById('summary-tbody');
+  if(!tbody) return;
+  tbody.innerHTML = sorted.map(({b:branch, att:attP}, i)=>{
+    const salesTotal = sumSales(branch, devs);
+    const{agreed, evaluated:trTotal} = sumAllTrades(branch);
+    const bn = branch==='Unknown'?'ไม่ระบุสาขา':branch;
+    const danger = attP < 15;
+    const rowBg  = danger ? 'bg-red-50 hover:bg-red-100' : (i%2===0?'bg-white hover:bg-gray-50':'bg-gray-50/60 hover:bg-gray-100');
+    const attColor = danger ? 'text-red-600 font-black' : (attP>=60?'text-emerald-600 font-black':'text-amber-600 font-black');
+    const barColor = danger ? 'bg-red-400' : (attP>=60?'bg-emerald-500':attP>=40?'bg-amber-400':'bg-orange-400');
+    const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+    // device mini-bars
+    const devMini = `<div class="flex flex-col gap-0.5">${devs.map(d=>{
+      const sold=(DATA.sales_by_branch[branch]||{})[d]||0;
+      return `<div class="flex items-center gap-1 text-[10px] leading-tight">
+        <span>${DEV_ICONS[d]}</span>
+        <span class="text-gray-600 font-semibold">${sold}</span>
+        <span class="text-[10px] text-gray-400">ชิ้น</span>
+      </div>`;
+    }).join('')}</div>`;
+    const rankNum = danger
+      ? `<span class="inline-flex w-6 h-6 rounded-full bg-red-500 text-white items-center justify-center text-xs font-black">${i+1}</span>`
+      : `<span class="text-gray-400 font-bold">${medal||i+1}</span>`;
+    return `<tr class="${rowBg} border-b border-gray-100 transition-colors">
+      <td class="px-1 py-2 text-center">${rankNum}</td>
+      <td class="px-2 py-2 overflow-hidden">
+        <div class="font-bold text-gray-800 text-sm leading-tight truncate" title="${bn}">${bn}</div>
+        ${danger?'<div class="text-[10px] text-red-500 font-bold">⚠ ต่ำกว่าเป้า 15%</div>':''}
+      </td>
+      <td class="px-1 py-2 text-center text-base font-black text-emerald-600">${agreed}</td>
+      <td class="px-1 py-2 text-center text-sm text-gray-500">${trTotal}</td>
+      <td class="px-1 py-2 text-center text-sm font-semibold text-[#9E7A3F]">${salesTotal}</td>
+      <td class="px-1 py-2">
+        <div class="flex items-center gap-1">
+          <div class="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
+            <div class="fill-bar h-full rounded-full ${barColor}" style="width:${Math.min(attP,100)}%"></div>
+          </div>
+          <span class="w-10 text-right text-sm font-black ${attColor}">${attP}%</span>
+        </div>
+      </td>
+      <td class="px-2 py-2 hidden md:table-cell">${devMini}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ===== HELPERS =====
+function pct(a,b){ return b>0?Math.round(a/b*100):0; }
+function attStyle(p){
+  if(p>=60)return{hex:'#059669',bg:'bg-emerald-500',label:'text-emerald-600'};
+  if(p>=40)return{hex:'#d97706',bg:'bg-amber-400',  label:'text-amber-600'};
+  return        {hex:'#dc2626',bg:'bg-red-400',     label:'text-red-500'};
+}
+function getSelDevs(){ return DEV_KEYS.filter(d=>document.getElementById('dev-'+d)?.checked); }
+function sumSales(b,devs){ const sb=DATA.sales_by_branch[b]||{}; return devs.reduce((s,d)=>s+(sb[d]||0),0); }
+function sumAllTrades(b){
+  const t=DATA.trade_summary[b]||{evaluated:0,agreed:0,not_agreed:0};
+  return{evaluated:t.evaluated,agreed:t.agreed,not_agreed:t.not_agreed,cancelled:0,waiting:0};
+}
+function sumTrades(b,devs){ return sumAllTrades(b); }
+
+function updateChips(){
+  document.querySelectorAll('.dev-chip').forEach(chip=>{
+    const checked=document.getElementById('dev-'+chip.dataset.dev)?.checked;
+    const lbl=chip.querySelector('.dev-label');
+    if(checked){
+      chip.classList.replace('border-gray-200','border-[#1F3B2D]');
+      chip.classList.replace('bg-gray-50','bg-[#E8F5EE]');
+      if(lbl){ lbl.classList.replace('text-gray-400','text-[#1F3B2D]'); }
+    } else {
+      chip.classList.replace('border-[#1F3B2D]','border-gray-200');
+      chip.classList.replace('bg-[#E8F5EE]','bg-gray-50');
+      if(lbl){ lbl.classList.replace('text-[#1F3B2D]','text-gray-400'); }
+    }
+  });
+}
+function onDevChange(){ updateChips(); render(); }
+
+// ===== RENDER =====
+function render(){
+  if(!DATA)return;
+  const devs=getSelDevs();
+
+  const devTotals={mac:0,ipad:0,iphone:0,watch:0};
+  Object.values(DATA.sales_by_branch).forEach(sb=>{ DEV_KEYS.forEach(d=>{ devTotals[d]+=(sb[d]||0); }); });
+  DEV_KEYS.forEach(d=>{ const el=document.getElementById('cnt-'+d); if(el)el.textContent=devTotals[d]; });
+
+  // ยึดรายชื่อสาขาตามไฟล์ยอดขาย — สาขาที่ไม่มียอดเทรดจะแสดง 0%
+  const allBranches=Object.keys(DATA.sales_by_branch).sort();
+  const hasUnknown=!!DATA.trade_summary['Unknown'];
+  let totalSales=0,totalAgreed=0,totalTrades=0;
+  [...allBranches,...(hasUnknown?['Unknown']:[])].forEach(b=>{
+    totalSales+=sumSales(b,devs);
+    const t=sumAllTrades(b); totalAgreed+=t.agreed; totalTrades+=t.evaluated;
+  });
+  const overallPct=pct(totalAgreed,totalSales);
+  const ov=attStyle(overallPct);
+
+  document.getElementById('nav-summary').innerHTML=`
+    <div class="flex items-center gap-2 bg-white/15 rounded-xl px-4 py-1.5">
+      <span class="text-white/60 text-xs">Overall ATT%</span>
+      <span class="font-black text-base" style="color:${ov.hex}">${overallPct}%</span>
+    </div>
+    <div class="flex items-center gap-2 bg-white/15 rounded-xl px-4 py-1.5">
+      <span class="text-white/60 text-xs">ตกลงเทรด</span>
+      <span class="text-emerald-300 font-bold text-sm">${totalAgreed}</span>
+    </div>
+    <div class="flex items-center gap-2 bg-white/15 rounded-xl px-4 py-1.5">
+      <span class="text-white/60 text-xs">Device ขาย</span>
+      <span class="text-[#C8A96B] font-bold text-sm">${totalSales}</span>
+    </div>`;
+
+  document.getElementById('overview-cards').innerHTML=`
+    <div class="bg-white rounded-xl shadow-card p-3 flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-[#E8F5EE] flex items-center justify-center text-lg shrink-0">🎯</div>
+      <div class="min-w-0">
+        <div class="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Overall ATT%</div>
+        <div class="text-2xl font-black leading-tight" style="color:${ov.hex}">${overallPct}%</div>
+        <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden mt-1"><div class="fill-bar h-full rounded-full ${ov.bg}" style="width:${Math.min(overallPct,100)}%"></div></div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl shadow-card p-3 flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center text-lg shrink-0">✅</div>
+      <div>
+        <div class="text-[11px] font-bold text-gray-400 uppercase tracking-wide">ตกลงเทรด</div>
+        <div class="text-2xl font-black text-emerald-600 leading-tight">${totalAgreed}</div>
+        <div class="text-[11px] text-gray-400">จาก ${totalTrades} รายการ</div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl shadow-card p-3 flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-[#FDF6E8] flex items-center justify-center text-lg shrink-0">📦</div>
+      <div>
+        <div class="text-[11px] font-bold text-gray-400 uppercase tracking-wide">Device ที่ขาย</div>
+        <div class="text-2xl font-black text-[#9E7A3F] leading-tight">${totalSales}</div>
+        <div class="text-[11px] text-gray-400">ชิ้น (ตามไฟล์ยอดขาย)</div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl shadow-card p-3 flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-[#E8F5EE] flex items-center justify-center text-lg shrink-0">🏪</div>
+      <div>
+        <div class="text-[11px] font-bold text-gray-400 uppercase tracking-wide">สาขา</div>
+        <div class="text-2xl font-black text-[#1F3B2D] leading-tight">${allBranches.length}</div>
+        <div class="text-[11px] text-gray-400">สาขา</div>
+      </div>
+    </div>`;
+
+  const branches=[...allBranches,...(hasUnknown?['Unknown']:[])];
+  const sorted=branches.map(b=>({b,att:pct(sumAllTrades(b).agreed,sumSales(b,devs))})).sort((a,b_)=>b_.att-a.att);
+
+  renderSummary(sorted, devs);
+
+  document.getElementById('trade-cards').innerHTML=sorted.map(({b:branch},bi)=>{
+    const C=BRANCH_COLORS[bi%BRANCH_COLORS.length];
+    const salesTotal=sumSales(branch,devs);
+    const{evaluated:trTotal,agreed,not_agreed}=sumAllTrades(branch);
+    const attP=pct(agreed,salesTotal);
+    const as_=attStyle(attP);
+    const bn=branch==='Unknown'?'ไม่ระบุสาขา':branch;
+
+    const devRows=devs.map(d=>{
+      const sold=(DATA.sales_by_branch[branch]||{})[d]||0;
+      return`<div class="flex items-center gap-2">
+        <span class="w-6 text-center text-base">${DEV_ICONS[d]}</span>
+        <span class="flex-1 text-xs text-gray-500 font-medium">${DEV_LABELS[d]}</span>
+        <span class="text-sm font-bold text-gray-700">${sold}</span>
+        <span class="text-xs text-gray-400">ชิ้น</span>
+      </div>`;
+    }).join('');
+
+    return`<div class="bg-white rounded-2xl shadow-card hover:shadow-card-lg transition-shadow duration-300 overflow-hidden">
+      <div class="bg-gradient-to-r ${C.from} ${C.to} px-5 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3 min-w-0">
+          <span class="text-2xl">${C.icon}</span>
+          <div class="min-w-0">
+            <div class="text-white font-bold text-sm truncate" title="${bn}">${bn}</div>
+            <div class="text-white/60 text-xs mt-0.5">Trade In</div>
+          </div>
+        </div>
+        <div class="text-right shrink-0">
+          <div class="text-3xl font-black text-white">${attP}%</div>
+          <div class="text-white/60 text-xs font-semibold -mt-0.5">ATT</div>
+        </div>
+      </div>
+      <div class="p-5 flex flex-col gap-4">
+        <div>
+          <div class="flex justify-between text-xs text-gray-500 mb-1.5">
+            <span>ตกลงเทรด <span class="font-bold text-emerald-600">${agreed}</span></span>
+            <span>ขายแล้ว <span class="font-bold text-[#9E7A3F]">${salesTotal}</span> ชิ้น</span>
+          </div>
+          <div class="h-3 bg-gray-100 rounded-full overflow-hidden">
+            <div class="fill-bar h-full rounded-full ${as_.bg}" style="width:${Math.min(attP,100)}%"></div>
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          <div class="bg-gray-50 rounded-xl p-2.5 text-center"><div class="text-lg font-black text-gray-700">${trTotal}</div><div class="text-[10px] text-gray-400 font-semibold">ยอดประเมิน</div></div>
+          <div class="bg-emerald-50 rounded-xl p-2.5 text-center"><div class="text-lg font-black text-emerald-600">${agreed}</div><div class="text-[10px] text-emerald-400 font-semibold">ตกลง</div></div>
+          <div class="bg-red-50 rounded-xl p-2.5 text-center"><div class="text-lg font-black text-red-500">${not_agreed}</div><div class="text-[10px] text-red-300 font-semibold">ไม่ตกลง</div></div>
+        </div>
+        ${devRows?`<div class="pt-1 border-t border-gray-100">
+          <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5">ยอดขาย Device ที่เลือก</div>
+          <div class="flex flex-col gap-2">${devRows}</div></div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
