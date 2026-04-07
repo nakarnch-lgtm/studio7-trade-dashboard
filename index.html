@@ -230,6 +230,12 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
               <option value="">AM ทั้งหมด</option>
             </select>
           </div>
+          <div class="flex items-center gap-1.5">
+            <label class="text-xs text-gray-500 font-semibold">สาขา:</label>
+            <select id="filter-branch" onchange="onAMRMChange()" class="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#1F3B2D] max-w-[180px]">
+              <option value="">สาขาทั้งหมด</option>
+            </select>
+          </div>
           <button onclick="resetAMRM()" class="text-xs text-gray-400 hover:text-gray-600 underline">รีเซ็ต</button>
         </div>
       </div>
@@ -606,9 +612,16 @@ function showDashboard(){
     fb.textContent=DATA.trade_format==='search'?'📋 trade_search':'📊 trade_report';
     fb.classList.remove('hidden');
   } else fb.classList.add('hidden');
-  // AM/RM filter — ใช้ branch_amrm (จากไฟล์ ASM)
+  // AM/RM filter + Branch filter
   const amrmFilter=document.getElementById('amrm-filter');
   const amrmPlaceholder=document.getElementById('amrm-placeholder');
+  // Populate branch dropdown (always available when data is loaded)
+  const allBranchKeys=new Set([
+    ...Object.keys(DATA&&DATA.trade_summary||{}),
+    ...Object.keys(DATA&&DATA.sales_by_branch||{})
+  ]);
+  const branchSel=document.getElementById('filter-branch');
+  if(branchSel) branchSel.innerHTML='<option value="">สาขาทั้งหมด</option>'+[...allBranchKeys].sort().map(v=>`<option value="${v}">${v}</option>`).join('');
   if(DATA&&DATA.has_amrm){
     const rms=new Set(), ams=new Set(), bus=new Set();
     Object.values(DATA.branch_amrm).forEach(v=>{
@@ -624,6 +637,10 @@ function showDashboard(){
     if(buSel) buSel.innerHTML='<option value="">BU ทั้งหมด</option>'+[...bus].sort().map(v=>`<option>${v}</option>`).join('');
     amrmFilter.classList.remove('hidden');
     amrmPlaceholder.classList.add('hidden');
+  } else if(DATA){
+    // ไม่มี ASM แต่ยังแสดง branch filter
+    amrmFilter.classList.remove('hidden');
+    amrmPlaceholder.classList.add('hidden');
   } else {
     amrmFilter.classList.add('hidden');
     amrmPlaceholder.classList.remove('hidden');
@@ -631,13 +648,18 @@ function showDashboard(){
   updateChips(); render();
 }
 function onAMRMChange(){ render(); }
-// กรองสาขาตาม BU/RM/AM (branch-level จากไฟล์ ASM)
+// กรองสาขาตาม BU/RM/AM/Branch (branch-level จากไฟล์ ASM + branch filter ใช้ได้เสมอ)
 function getAMRMBranches(){
-  if(!DATA||!DATA.has_amrm)return null; // null = ไม่กรอง
+  if(!DATA)return null; // null = ไม่กรอง
   const bu=document.getElementById('filter-bu')?.value||'';
   const rm=document.getElementById('filter-rm')?.value||'';
   const am=document.getElementById('filter-am')?.value||'';
-  if(!bu&&!rm&&!am)return null;
+  const br=document.getElementById('filter-branch')?.value||'';
+  if(!bu&&!rm&&!am&&!br)return null;
+  // กรองด้วย branch เดียวโดยไม่ต้องมี ASM
+  if(br&&!bu&&!rm&&!am)return new Set([br]);
+  // กรองด้วย BU/RM/AM ต้องมีไฟล์ ASM
+  if(!DATA.has_amrm)return br?new Set([br]):null;
   const matched=new Set();
   Object.entries(DATA.branch_amrm).forEach(([branch,v])=>{
     if(bu&&v.bu!==bu)return;
@@ -645,10 +667,12 @@ function getAMRMBranches(){
     if(am&&v.am!==am)return;
     matched.add(branch);
   });
+  // ถ้าเลือก branch เพิ่มเติม → กรองให้เหลือเฉพาะสาขานั้น
+  if(br) return matched.has(br)?new Set([br]):new Set(['__no_match__']);
   return matched.size>0?matched:new Set(['__no_match__']);
 }
 function resetAMRM(){
-  ['filter-bu','filter-rm','filter-am'].forEach(id=>{
+  ['filter-bu','filter-rm','filter-am','filter-branch'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
   render();
@@ -841,6 +865,7 @@ function render(){
     const attP=pct(agreed,salesTotal);
     const as_=attStyle(attP);
     const bn=branch==='Unknown'?'ไม่ระบุสาขา':branch;
+    const headerBg=attP<15?'#CA3433':'#50C878';
 
     const devRows=devs.map(d=>{
       const sold=(DATA.sales_by_branch[branch]||{})[d]||0;
@@ -897,7 +922,7 @@ function render(){
 
 
     return`<div class="bg-white rounded-2xl shadow-card hover:shadow-card-lg transition-shadow duration-300 overflow-hidden">
-      <div class="px-5 py-4 flex items-center justify-between" style="background:#50C878">
+      <div class="px-5 py-4 flex items-center justify-between" style="background:${headerBg}">
         <div class="flex items-center gap-3 min-w-0">
           <span class="text-2xl">🏬</span>
           <div class="min-w-0">
