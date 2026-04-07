@@ -416,28 +416,27 @@ function devFromProduct(prod){
   if(/^MacBook|^Mac/i.test(p))return 'mac';
   return null;
 }
-// Parse trade_search format (transaction-level, ทั้งประเทศ)
-function parseTradeSearch(rows, activeMths, salesKeys){
-  const AGREED_STATUS=new Set([5,7]); // 5=สิ้นสุดการประเมินราคา, 7=ยืนยันราคาแล้ว
+// Parse trade_search format (transaction-level)
+// activeDates = Set of "DD/MM/YYYY" CE strings; empty Set = no filter
+function parseTradeSearch(rows, activeDates, salesKeys){
+  const AGREED_STATUS=new Set([5,7]);
   const summary={};
-  const byEmp={}; // รหัสพนักงานขาย → {name, branch, trades:[{dev,agreed}]}
+  const byEmp={};
   rows.forEach(r=>{
     const rawBranch=s(r['ชื่อสาขา']||r['BRANCH_NAME']||'');
     if(!rawBranch)return;
     const branch=matchBranch(rawBranch,salesKeys)||rawBranch;
-    // month filter
-    if(activeMths.size>0){
+    // date filter (CE format DD/MM/YYYY)
+    if(activeDates.size>0){
       const td=s(r['วันที่คำสั่งเทรด']||'');
-      const mp=td.match(/\d{2}\/(\d{2})\/\d{4}/);
-      if(!mp||!activeMths.has(parseInt(mp[1])))return;
+      if(!activeDates.has(td))return;
     }
     const bst=Number(r['BIDDING_STATUS'])||0;
     const agreed=AGREED_STATUS.has(bst)?1:0;
-    if(!summary[branch])summary[branch]={evaluated:0,agreed:0,not_agreed:0,byMonth:{}};
+    if(!summary[branch])summary[branch]={evaluated:0,agreed:0,not_agreed:0};
     summary[branch].evaluated++;
     if(agreed)summary[branch].agreed++;
     else summary[branch].not_agreed++;
-    // employee tracking
     const empId=s(r['รหัสพนักงานขาย']||'');
     const empName=s(r['ชื่อพนักงานขาย']||'');
     if(empId){
@@ -495,21 +494,45 @@ async function processFiles(){
     let tradeSummary={}, byEmpTrade={};
 
     if(tradeFormat==='search'){
-      // trade_search = transaction-level: ไม่กรองตาม activeMths (ไฟล์เทรดมีช่วงเวลาต่างกับยอดขาย)
-      // ดึงเดือนจากไฟล์เทรดโดยตรงเพื่อแสดง badge
-      const tradeMths=new Set();
-      tRows.forEach(r=>{
-        const td=s(r['วันที่คำสั่งเทรด']||'');
-        const mp=td.match(/\d{2}\/(\d{2})\/\d{4}/);
-        if(mp){ const mn=parseInt(mp[1]); if(mn>=1&&mn<=12)tradeMths.add(mn); }
+      // แปลงวันที่จากไฟล์ยอดขาย: BE → CE (DD/MM/YYYY CE)
+      const activeDates=new Set();
+      sRows.forEach(r=>{
+        const raw=s(r[kDate]);
+        const m=raw.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+        if(m){
+          const ceYear=parseInt(m[3])>2100?parseInt(m[3])-543:parseInt(m[3]);
+          activeDates.add(`${m[1]}/${m[2]}/${ceYear}`);
+        }
       });
-      const result=parseTradeSearch(tRows, new Set(), salesKeys); // ส่ง Set() ว่าง = ไม่กรองเดือน
+
+      // กรองตามวันที่ขาย Device; ถ้าไม่มี overlap ให้ fallback แสดงข้อมูลทั้งหมด
+      let result=parseTradeSearch(tRows,activeDates,salesKeys);
+      const totalFiltered=Object.values(result.summary).reduce((s,v)=>s+v.evaluated,0);
+      let dateFiltered=true;
+      if(totalFiltered===0&&activeDates.size>0){
+        // ไม่มี overlap — fallback แสดงข้อมูลทั้งหมดในไฟล์เทรด
+        result=parseTradeSearch(tRows,new Set(),salesKeys);
+        dateFiltered=false;
+      }
       tradeSummary=result.summary;
       byEmpTrade=result.byEmp;
-      const allMths=[...tradeMths].sort((a,b)=>a-b).map(m=>THAI_MTH[m]);
-      const salesBadge=activeMths.size>0?'ยอดขาย: '+[...activeMths].sort((a,b)=>a-b).map(m=>THAI_MTH[m]).join(', '):'';
-      const tradeBadge=allMths.length>0?'เทรด: '+allMths.join(', '):'';
-      DATA_MONTHS=[salesBadge,tradeBadge].filter(Boolean).join(' | ');
+
+      // Build date badges
+      const sdArr=[...activeDates].sort();
+      const salesDateBadge=sdArr.length>0?'ขาย: '+sdArr[0]+(sdArr.length>1?' – '+sdArr[sdArr.length-1]:''):'';
+      if(dateFiltered){
+        DATA_MONTHS=salesDateBadge;
+      } else {
+        // แสดงช่วงเดือนจากไฟล์เทรดแทน
+        const tradeMths=new Set();
+        tRows.forEach(r=>{
+          const td=s(r['วันที่คำสั่งเทรด']||'');
+          const mp=td.match(/\d{2}\/(\d{2})\/\d{4}/);
+          if(mp){ const mn=parseInt(mp[1]); if(mn>=1&&mn<=12)tradeMths.add(mn); }
+        });
+        const tBadge=[...tradeMths].sort((a,b)=>a-b).map(m=>THAI_MTH[m]).join(', ');
+        DATA_MONTHS=(salesDateBadge?salesDateBadge+' | ':'')+`เทรด: ${tBadge} (ทั้งหมด)`;
+      }
     } else {
       // Summary report format (trade_report) — reconcile then filter by month
       const rawSummary=parseTradeReport(tRows);
@@ -700,6 +723,7 @@ function attStyle(p){
 }
 function getSelDevs(){ return DEV_KEYS.filter(d=>document.getElementById('dev-'+d)?.checked); }
 function sumSales(b,devs){ const sb=DATA.sales_by_branch[b]||{}; return devs.reduce((s,d)=>s+(sb[d]||0),0); }
+function sumEmpSales(empId,devs){ const se=DATA.sales_by_emp[String(empId)]||{}; return devs.reduce((s,d)=>s+(se[d]||0),0); }
 function sumAllTrades(b){
   const t=DATA.trade_summary[b]||{evaluated:0,agreed:0,not_agreed:0};
   return{evaluated:t.evaluated,agreed:t.agreed,not_agreed:t.not_agreed,cancelled:0,waiting:0};
@@ -816,6 +840,50 @@ function render(){
       </div>`;
     }).join('');
 
+    // Employee breakdown: employees with trade activity in this branch
+    const branchEmps=Object.entries(DATA.by_emp||{})
+      .filter(([,v])=>v.branch===branch)
+      .map(([empId,v])=>{
+        const devSold=sumEmpSales(empId,devs);
+        const empAtt=pct(v.agreed,devSold);
+        return{empId,name:v.name,agreed:v.agreed,evaluated:v.evaluated,devSold,empAtt};
+      })
+      .sort((a,b)=>b.empAtt-a.empAtt||b.agreed-a.agreed);
+    const empRowsHtml=branchEmps.length>0?`
+      <div class="pt-2 border-t border-gray-100">
+        <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0"/></svg>
+          รายพนักงาน (${branchEmps.length} คน)
+        </div>
+        <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="text-[10px] text-gray-400 font-semibold border-b border-gray-100">
+              <th class="text-left pb-1.5 pr-2">ชื่อพนักงาน</th>
+              <th class="text-center pb-1.5 px-1">Device<br><span class="font-normal text-gray-300">ขาย</span></th>
+              <th class="text-center pb-1.5 px-1">ตกลง<br><span class="font-normal text-gray-300">เทรด</span></th>
+              <th class="text-center pb-1.5 px-1">ยอด<br><span class="font-normal text-gray-300">ประเมิน</span></th>
+              <th class="text-center pb-1.5 pl-1">ATT%</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${branchEmps.map(e=>{
+              const as2=attStyle(e.empAtt);
+              const bg=e.empAtt>=60?'text-emerald-600':e.empAtt>=40?'text-amber-600':e.empAtt>0?'text-red-500':'text-gray-400';
+              return`<tr class="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                <td class="py-1.5 pr-2 font-medium text-gray-700 max-w-[100px] truncate" title="${e.name}">${e.name||e.empId}</td>
+                <td class="text-center px-1 font-semibold text-[#9E7A3F]">${e.devSold>0?e.devSold:'–'}</td>
+                <td class="text-center px-1 font-bold text-emerald-600">${e.agreed}</td>
+                <td class="text-center px-1 text-gray-500">${e.evaluated}</td>
+                <td class="text-center pl-1 font-black text-sm ${bg}">${e.devSold>0?e.empAtt+'%':'–'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+        </div>
+      </div>`:'';
+
+
     return`<div class="bg-white rounded-2xl shadow-card hover:shadow-card-lg transition-shadow duration-300 overflow-hidden">
       <div class="bg-gradient-to-r ${C.from} ${C.to} px-5 py-4 flex items-center justify-between">
         <div class="flex items-center gap-3 min-w-0">
@@ -848,6 +916,7 @@ function render(){
         ${devRows?`<div class="pt-1 border-t border-gray-100">
           <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5">ยอดขาย Device ที่เลือก</div>
           <div class="flex flex-col gap-2">${devRows}</div></div>`:''}
+        ${empRowsHtml}
       </div>
     </div>`;
   }).join('');
