@@ -278,7 +278,7 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
 // ===== CONSTANTS =====
 const DEV_KEYS   = ['mac','ipad','iphone','watch'];
 const DEV_LABELS = {mac:'Mac',ipad:'iPad',iphone:'iPhone',watch:'Apple Watch'};
-const DEV_ICONS  = {mac:'💻',ipad:'⬛️',iphone:'📱',watch:'⌚'};
+const DEV_ICONS  = {mac:'💻',ipad:'📲',iphone:'📱',watch:'⌚'};
 const CAT_DEV    = {'Mac':'mac','iPad':'ipad','iPhone':'iphone','Apple Watch':'watch'};
 const TRADE_DEV  = {'MacBook':'mac','iPad':'ipad','iPhone':'iphone','Apple Watch':'watch','Smart Phone':'smartphone'};
 const BRANCH_COLORS = [
@@ -836,7 +836,6 @@ function render(){
   renderSummary(sorted, devs);
 
   document.getElementById('trade-cards').innerHTML=sorted.map(({b:branch},bi)=>{
-    const C=BRANCH_COLORS[bi%BRANCH_COLORS.length];
     const salesTotal=sumSales(branch,devs);
     const{evaluated:trTotal,agreed,not_agreed}=sumAllTrades(branch);
     const attP=pct(agreed,salesTotal);
@@ -898,9 +897,9 @@ function render(){
 
 
     return`<div class="bg-white rounded-2xl shadow-card hover:shadow-card-lg transition-shadow duration-300 overflow-hidden">
-      <div class="bg-gradient-to-r ${C.from} ${C.to} px-5 py-4 flex items-center justify-between">
+      <div class="px-5 py-4 flex items-center justify-between" style="background:#50C878">
         <div class="flex items-center gap-3 min-w-0">
-          <span class="text-2xl">${C.icon}</span>
+          <span class="text-2xl">🏬</span>
           <div class="min-w-0">
             <div class="text-white font-bold text-sm truncate" title="${bn}">${bn}</div>
             <div class="text-white/60 text-xs mt-0.5">Trade In</div>
