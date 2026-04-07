@@ -41,27 +41,27 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
         <div class="text-gray-400 text-sm font-medium">Trade In Dashboard</div>
       </div>
     </div>
-    <p class="text-gray-600 text-sm font-medium">อัปโหลดไฟล์ Excel 2 ไฟล์เพื่อเริ่มวิเคราะห์ข้อมูล</p>
+    <p class="text-gray-600 text-sm font-medium">อัปโหลดไฟล์ Excel 2–3 ไฟล์เพื่อเริ่มวิเคราะห์ข้อมูล</p>
     <div class="mt-2 flex items-center justify-center gap-2 text-xs text-gray-400">
       <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
       ประมวลผลในเบราว์เซอร์เท่านั้น · ไม่มีการส่งข้อมูลออก · รีเฟรชเพื่อล้างข้อมูล
     </div>
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl mb-8">
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-5 w-full max-w-3xl mb-8">
     <!-- File 1: Sales -->
     <div>
       <div class="flex items-center gap-2 mb-2.5">
         <span class="w-6 h-6 rounded-full bg-[#1F3B2D] text-white flex items-center justify-center text-xs font-black shrink-0">1</span>
-        <span class="text-xs font-bold text-gray-600 uppercase tracking-wide">ไฟล์ยอดขาย (52_april)</span>
+        <span class="text-xs font-bold text-gray-600 uppercase tracking-wide">ไฟล์ยอดขาย</span>
       </div>
       <div id="drop-sales"
-        class="drop-zone bg-white rounded-2xl shadow-card border-2 border-dashed border-gray-200 p-8 text-center cursor-pointer transition-all hover:border-[#1F3B2D] hover:bg-[#F5FDF8]"
+        class="drop-zone bg-white rounded-2xl shadow-card border-2 border-dashed border-gray-200 p-6 text-center cursor-pointer transition-all hover:border-[#1F3B2D] hover:bg-[#F5FDF8]"
         onclick="document.getElementById('input-sales').click()"
         ondragover="onDragOver(event,'drop-sales')" ondragleave="onDragLeave('drop-sales')" ondrop="onDrop(event,'sales')">
-        <div class="text-4xl mb-3">📊</div>
-        <div class="text-sm font-semibold text-gray-700 mb-1">คลิกหรือลากไฟล์มาวาง</div>
-        <div class="text-xs text-gray-400">ไฟล์ .xlsx ข้อมูลยอดขาย</div>
+        <div class="text-3xl mb-2">📊</div>
+        <div class="text-sm font-semibold text-gray-700 mb-0.5">คลิกหรือลากไฟล์มาวาง</div>
+        <div class="text-xs text-gray-400">52_april / ยอดขาย</div>
         <div id="sales-filename" class="hidden mt-3 text-xs font-semibold text-[#1F3B2D] bg-[#E8F5EE] rounded-xl px-3 py-1.5"></div>
       </div>
       <input type="file" id="input-sales" accept=".xlsx,.xls" class="hidden" onchange="onFileSelect(event,'sales')">
@@ -71,18 +71,36 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
     <div>
       <div class="flex items-center gap-2 mb-2.5">
         <span class="w-6 h-6 rounded-full bg-[#C8A96B] text-[#1F3B2D] flex items-center justify-center text-xs font-black shrink-0">2</span>
-        <span class="text-xs font-bold text-gray-600 uppercase tracking-wide">รายงานเทรด (trade_report)</span>
+        <span class="text-xs font-bold text-gray-600 uppercase tracking-wide">รายงานเทรด</span>
       </div>
       <div id="drop-trade"
-        class="drop-zone bg-white rounded-2xl shadow-card border-2 border-dashed border-gray-200 p-8 text-center cursor-pointer transition-all hover:border-[#C8A96B] hover:bg-[#FDF9F0]"
+        class="drop-zone bg-white rounded-2xl shadow-card border-2 border-dashed border-gray-200 p-6 text-center cursor-pointer transition-all hover:border-[#C8A96B] hover:bg-[#FDF9F0]"
         onclick="document.getElementById('input-trade').click()"
         ondragover="onDragOver(event,'drop-trade')" ondragleave="onDragLeave('drop-trade')" ondrop="onDrop(event,'trade')">
-        <div class="text-4xl mb-3">🔄</div>
-        <div class="text-sm font-semibold text-gray-700 mb-1">คลิกหรือลากไฟล์มาวาง</div>
-        <div class="text-xs text-gray-400">ไฟล์ .xlsx ข้อมูลการเทรด</div>
+        <div class="text-3xl mb-2">🔄</div>
+        <div class="text-sm font-semibold text-gray-700 mb-0.5">คลิกหรือลากไฟล์มาวาง</div>
+        <div class="text-xs text-gray-400">trade_report / trade_search</div>
         <div id="trade-filename" class="hidden mt-3 text-xs font-semibold text-[#9E7A3F] bg-[#FDF6E8] rounded-xl px-3 py-1.5"></div>
       </div>
       <input type="file" id="input-trade" accept=".xlsx,.xls" class="hidden" onchange="onFileSelect(event,'trade')">
+    </div>
+
+    <!-- File 3: ASM mapping (optional) -->
+    <div>
+      <div class="flex items-center gap-2 mb-2.5">
+        <span class="w-6 h-6 rounded-full bg-sky-500 text-white flex items-center justify-center text-xs font-black shrink-0">3</span>
+        <span class="text-xs font-bold text-gray-600 uppercase tracking-wide">AM/RM <span class="normal-case text-gray-400 font-normal">(optional)</span></span>
+      </div>
+      <div id="drop-asm"
+        class="drop-zone bg-white rounded-2xl shadow-card border-2 border-dashed border-gray-200 p-6 text-center cursor-pointer transition-all hover:border-sky-400 hover:bg-sky-50"
+        onclick="document.getElementById('input-asm').click()"
+        ondragover="onDragOver(event,'drop-asm')" ondragleave="onDragLeave('drop-asm')" ondrop="onDrop(event,'asm')">
+        <div class="text-3xl mb-2">👥</div>
+        <div class="text-sm font-semibold text-gray-700 mb-0.5">คลิกหรือลากไฟล์มาวาง</div>
+        <div class="text-xs text-gray-400">asm_feb / ข้อมูล AM RM</div>
+        <div id="asm-filename" class="hidden mt-3 text-xs font-semibold text-sky-700 bg-sky-50 rounded-xl px-3 py-1.5"></div>
+      </div>
+      <input type="file" id="input-asm" accept=".xlsx,.xls" class="hidden" onchange="onFileSelect(event,'asm')">
     </div>
   </div>
 
@@ -195,15 +213,21 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
         </div>
         <div class="flex flex-wrap gap-2 items-center">
           <div class="flex items-center gap-1.5">
+            <label class="text-xs text-gray-500 font-semibold">BU:</label>
+            <select id="filter-bu" onchange="onAMRMChange()" class="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#1F3B2D]">
+              <option value="">BU ทั้งหมด</option>
+            </select>
+          </div>
+          <div class="flex items-center gap-1.5">
             <label class="text-xs text-gray-500 font-semibold">RM:</label>
             <select id="filter-rm" onchange="onAMRMChange()" class="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#1F3B2D]">
-              <option value="">ทั้งหมด</option>
+              <option value="">RM ทั้งหมด</option>
             </select>
           </div>
           <div class="flex items-center gap-1.5">
             <label class="text-xs text-gray-500 font-semibold">AM:</label>
             <select id="filter-am" onchange="onAMRMChange()" class="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#1F3B2D]">
-              <option value="">ทั้งหมด</option>
+              <option value="">AM ทั้งหมด</option>
             </select>
           </div>
           <button onclick="resetAMRM()" class="text-xs text-gray-400 hover:text-gray-600 underline">รีเซ็ต</button>
@@ -269,17 +293,18 @@ const BRANCH_COLORS = [
   {from:'from-[#1e3a8a]',to:'to-[#60a5fa]',icon:'🏪'},
 ];
 
-let DATA = null, fileSales = null, fileTrade = null, DATA_MONTHS = '';
+let DATA = null, fileSales = null, fileTrade = null, fileASM = null, DATA_MONTHS = '';
 
 // ===== DRAG & DROP =====
 function onDragOver(e,id){ e.preventDefault(); document.getElementById(id).classList.add('drag-over'); }
 function onDragLeave(id) { document.getElementById(id).classList.remove('drag-over'); }
-function onDrop(e,type)  { e.preventDefault(); onDragLeave(type==='sales'?'drop-sales':'drop-trade'); const f=e.dataTransfer.files[0]; if(f) handleFile(f,type); }
+function onDrop(e,type){ e.preventDefault(); onDragLeave('drop-'+type); const f=e.dataTransfer.files[0]; if(f) handleFile(f,type); }
 function onFileSelect(e,type){ const f=e.target.files[0]; if(f) handleFile(f,type); }
 
 function handleFile(file, type){
   if(type==='sales'){ fileSales=file; mark('sales-filename','📊 '+file.name,'text-[#1F3B2D]','bg-[#E8F5EE]'); }
-  else              { fileTrade=file; mark('trade-filename','🔄 '+file.name,'text-[#9E7A3F]','bg-[#FDF6E8]'); }
+  else if(type==='trade'){ fileTrade=file; mark('trade-filename','🔄 '+file.name,'text-[#9E7A3F]','bg-[#FDF6E8]'); }
+  else if(type==='asm')  { fileASM=file;  mark('asm-filename','👥 '+file.name,'text-sky-700','bg-sky-50'); }
   if(fileSales && fileTrade) document.getElementById('process-btn').classList.remove('hidden');
 }
 function mark(id, text, textCls, bgCls){
@@ -336,6 +361,23 @@ function statusCode(st){
   if(st==='ยกเลิกรายการ')return 2;
   if(st==='รอผู้ขายยืนยันราคา')return 3;
   return 0;
+}
+// Parse ASM file → branchAMRM map: {shortBranch → {am, rm, bu, id}}
+function parseASMFile(rows, salesKeys){
+  const map={};
+  rows.forEach(r=>{
+    const raw=s(r['Name']||r['BRANCH_NAME']||r['Branch']||'');
+    if(!raw)return;
+    const short=shortBranch(raw);
+    const matched=matchBranch(short, salesKeys)||short;
+    map[matched]={
+      am: s(r['AM']||'').trim(),
+      rm: s(r['RM']||'').trim(),
+      bu: s(r['BU']||'').trim(),
+      id: r['ID']||''
+    };
+  });
+  return map;
 }
 // ตรวจรูปแบบไฟล์ trade: 'search' = transaction-level, 'report' = 3-row-per-branch summary
 function detectTradeFormat(rows){
@@ -451,16 +493,13 @@ async function processFiles(){
       } else { DATA_MONTHS=''; }
     }
 
-    // Build AM/RM map from sales file if columns exist (รองรับอนาคต)
-    const kAM=findCol(sS,['AM','AM Name','Area Manager','ผู้จัดการเขต']);
-    const kRM=findCol(sS,['RM','RM Name','Regional Manager','ผู้จัดการภาค']);
-    const amrmMap={}; // empId → {am, rm}
-    const hasAMRM=kAM in sS && kRM in sS;
-    if(hasAMRM){
-      sRows.forEach(r=>{
-        const oid=s(r[kOff]); if(!oid)return;
-        amrmMap[oid]={am:s(r[kAM]),rm:s(r[kRM])};
-      });
+    // Parse ASM mapping file if provided (optional ไฟล์ 3)
+    let branchAMRM={}, hasAMRM=false;
+    if(fileASM){
+      document.getElementById('loading-msg').textContent='กำลังอ่านข้อมูล AM/RM…';
+      const asmRows=await readXlsx(fileASM);
+      branchAMRM=parseASMFile(asmRows, salesKeys);
+      hasAMRM=Object.keys(branchAMRM).length>0;
     }
 
     DATA={
@@ -469,7 +508,7 @@ async function processFiles(){
       trade_format:tradeFormat,
       by_emp:byEmpTrade,
       sales_by_emp:salesByEmp,
-      amrm_map:amrmMap,
+      branch_amrm:branchAMRM,
       has_amrm:hasAMRM
     };
     showDashboard();
@@ -500,17 +539,22 @@ function showDashboard(){
     fb.textContent=DATA.trade_format==='search'?'📋 trade_search':'📊 trade_report';
     fb.classList.remove('hidden');
   } else fb.classList.add('hidden');
-  // AM/RM filter
+  // AM/RM filter — ใช้ branch_amrm (จากไฟล์ ASM)
   const amrmFilter=document.getElementById('amrm-filter');
   const amrmPlaceholder=document.getElementById('amrm-placeholder');
   if(DATA&&DATA.has_amrm){
-    // Populate RM/AM dropdowns
-    const rms=new Set(), ams=new Set();
-    Object.values(DATA.amrm_map).forEach(v=>{ if(v.rm)rms.add(v.rm); if(v.am)ams.add(v.am); });
+    const rms=new Set(), ams=new Set(), bus=new Set();
+    Object.values(DATA.branch_amrm).forEach(v=>{
+      if(v.rm&&v.rm!=='-')rms.add(v.rm);
+      if(v.am&&v.am!=='-')ams.add(v.am);
+      if(v.bu)bus.add(v.bu);
+    });
     const rmSel=document.getElementById('filter-rm');
     const amSel=document.getElementById('filter-am');
-    rmSel.innerHTML='<option value="">ทั้งหมด</option>'+[...rms].sort().map(v=>`<option>${v}</option>`).join('');
-    amSel.innerHTML='<option value="">ทั้งหมด</option>'+[...ams].sort().map(v=>`<option>${v}</option>`).join('');
+    const buSel=document.getElementById('filter-bu');
+    rmSel.innerHTML='<option value="">RM ทั้งหมด</option>'+[...rms].sort().map(v=>`<option>${v}</option>`).join('');
+    amSel.innerHTML='<option value="">AM ทั้งหมด</option>'+[...ams].sort().map(v=>`<option>${v}</option>`).join('');
+    if(buSel) buSel.innerHTML='<option value="">BU ทั้งหมด</option>'+[...bus].sort().map(v=>`<option>${v}</option>`).join('');
     amrmFilter.classList.remove('hidden');
     amrmPlaceholder.classList.add('hidden');
   } else {
@@ -520,41 +564,36 @@ function showDashboard(){
   updateChips(); render();
 }
 function onAMRMChange(){ render(); }
-function resetAMRM(){
-  document.getElementById('filter-rm').value='';
-  document.getElementById('filter-am').value='';
-  render();
-}
-// กรองสาขาตาม AM/RM (ใช้ amrm_map ที่ join ผ่าน Officer ID)
+// กรองสาขาตาม BU/RM/AM (branch-level จากไฟล์ ASM)
 function getAMRMBranches(){
   if(!DATA||!DATA.has_amrm)return null; // null = ไม่กรอง
+  const bu=document.getElementById('filter-bu')?.value||'';
   const rm=document.getElementById('filter-rm')?.value||'';
   const am=document.getElementById('filter-am')?.value||'';
-  if(!rm&&!am)return null;
-  // หาพนักงานที่ตรงเงื่อนไข
-  const matchEmp=new Set();
-  Object.entries(DATA.amrm_map).forEach(([eid,v])=>{
+  if(!bu&&!rm&&!am)return null;
+  const matched=new Set();
+  Object.entries(DATA.branch_amrm).forEach(([branch,v])=>{
+    if(bu&&v.bu!==bu)return;
     if(rm&&v.rm!==rm)return;
     if(am&&v.am!==am)return;
-    matchEmp.add(eid);
+    matched.add(branch);
   });
-  // หาสาขาที่พนักงานเหล่านี้ขาย
-  const matchBranches=new Set();
-  Object.entries(DATA.sales_by_emp||{}).forEach(([eid,devMap])=>{
-    if(!matchEmp.has(eid))return;
-    // หาสาขาของพนักงานคนนี้จาก by_emp trade หรือ sales branch mapping
-    if(DATA.by_emp[eid])matchBranches.add(DATA.by_emp[eid].branch);
+  return matched.size>0?matched:new Set(['__no_match__']);
+}
+function resetAMRM(){
+  ['filter-bu','filter-rm','filter-am'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
   });
-  return matchBranches.size>0?matchBranches:new Set(['__no_match__']);
+  render();
 }
 
 function resetDashboard(){
-  DATA=null; fileSales=null; fileTrade=null; DATA_MONTHS='';
+  DATA=null; fileSales=null; fileTrade=null; fileASM=null; DATA_MONTHS='';
   document.getElementById('dashboard-screen').classList.add('hidden');
   document.getElementById('upload-screen').classList.remove('hidden');
   document.getElementById('process-btn').classList.add('hidden');
-  ['input-sales','input-trade'].forEach(id=>{ document.getElementById(id).value=''; });
-  ['sales-filename','trade-filename'].forEach(id=>{ document.getElementById(id).classList.add('hidden'); });
+  ['input-sales','input-trade','input-asm'].forEach(id=>{ document.getElementById(id).value=''; });
+  ['sales-filename','trade-filename','asm-filename'].forEach(id=>{ document.getElementById(id).classList.add('hidden'); });
   DEV_KEYS.forEach(d=>{ document.getElementById('dev-'+d).checked=true; });
   updateChips();
 }
