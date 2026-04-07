@@ -324,13 +324,34 @@ function readXlsx(file){
 function findCol(sample, candidates){ for(const c of candidates){ if(c in sample) return c; } return candidates[0]; }
 function s(v){ return v!=null?String(v):''; }
 function shortBranch(b){ if(!b)return'Unknown'; return b.includes(': ')?b.split(': ').slice(1).join(': '):b.includes(':')?b.split(':').slice(1).join(':').trim():b; }
-function normBranch(b){ return b.toLowerCase().replace(/studio\s*7/g,'studio7').replace(/b-play/g,'bplay').replace(/[^a-z0-9ก-๙]/g,' ').replace(/\s+/g,' ').trim(); }
+function normBranch(b){
+  return b.toLowerCase()
+    .replace(/studio\s*7/g,'studio7')   // Studio7 / Studio 7 → studio7
+    .replace(/\bbig\s*-?\s*c\b/g,'bigc') // Big C / Big-C → bigc
+    .replace(/\bbic\s+c\b/g,'bigc')      // Bic C (typo) → bigc
+    .replace(/b-play/g,'bplay')
+    .replace(/\(ustore\)/gi,' ustore ')
+    .replace(/\([^)]*\)/g,' ')           // strip remaining (parenthetical)
+    .replace(/[^a-z0-9ก-๙]/g,' ')
+    .replace(/\s+/g,' ').trim();
+}
 function matchBranch(reportName, salesKeys){
   const rn=normBranch(reportName);
   // exact match first
   for(const k of salesKeys){ if(normBranch(k)===rn)return k; }
   // contains match
   for(const k of salesKeys){ const kn=normBranch(k); if(rn.includes(kn)||kn.includes(rn))return k; }
+  // word-overlap fuzzy match (≥3 meaningful words in common, and overlap≥60%)
+  const rw=new Set(rn.split(' ').filter(w=>w.length>2));
+  let bestK=null, bestScore=0;
+  for(const k of salesKeys){
+    const kn=normBranch(k);
+    const kw=kn.split(' ').filter(w=>w.length>2);
+    const common=kw.filter(w=>rw.has(w)).length;
+    const shorter=Math.min(rw.size,kw.length);
+    if(common>=3 && common/shorter>=0.6 && common>bestScore){ bestScore=common; bestK=k; }
+  }
+  if(bestK) return bestK;
   return reportName; // fallback — use as-is
 }
 function parseTradeReport(rows){
