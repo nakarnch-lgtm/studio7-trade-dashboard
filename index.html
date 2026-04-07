@@ -495,11 +495,21 @@ async function processFiles(){
     let tradeSummary={}, byEmpTrade={};
 
     if(tradeFormat==='search'){
-      // Transaction-level format (trade_search) — กรองเดือนใน parser โดยตรง
-      const result=parseTradeSearch(tRows,activeMths,salesKeys);
+      // trade_search = transaction-level: ไม่กรองตาม activeMths (ไฟล์เทรดมีช่วงเวลาต่างกับยอดขาย)
+      // ดึงเดือนจากไฟล์เทรดโดยตรงเพื่อแสดง badge
+      const tradeMths=new Set();
+      tRows.forEach(r=>{
+        const td=s(r['วันที่คำสั่งเทรด']||'');
+        const mp=td.match(/\d{2}\/(\d{2})\/\d{4}/);
+        if(mp){ const mn=parseInt(mp[1]); if(mn>=1&&mn<=12)tradeMths.add(mn); }
+      });
+      const result=parseTradeSearch(tRows, new Set(), salesKeys); // ส่ง Set() ว่าง = ไม่กรองเดือน
       tradeSummary=result.summary;
       byEmpTrade=result.byEmp;
-      DATA_MONTHS=activeMths.size>0?[...activeMths].sort((a,b)=>a-b).map(m=>THAI_MTH[m]).join(', '):'';
+      const allMths=[...tradeMths].sort((a,b)=>a-b).map(m=>THAI_MTH[m]);
+      const salesBadge=activeMths.size>0?'ยอดขาย: '+[...activeMths].sort((a,b)=>a-b).map(m=>THAI_MTH[m]).join(', '):'';
+      const tradeBadge=allMths.length>0?'เทรด: '+allMths.join(', '):'';
+      DATA_MONTHS=[salesBadge,tradeBadge].filter(Boolean).join(' | ');
     } else {
       // Summary report format (trade_report) — reconcile then filter by month
       const rawSummary=parseTradeReport(tRows);
