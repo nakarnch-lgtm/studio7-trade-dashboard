@@ -165,7 +165,7 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
           </label>
           <label class="dev-chip flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 cursor-pointer select-none transition-all border-[#1F3B2D] bg-[#E8F5EE]" data-dev="ipad">
             <input type="checkbox" id="dev-ipad" checked class="hidden" onchange="onDevChange()">
-            <span>🟧</span><span class="dev-label text-sm font-bold text-[#1F3B2D]">iPad</span>
+            <span>⬛️</span><span class="dev-label text-sm font-bold text-[#1F3B2D]">iPad</span>
             <span id="cnt-ipad" class="text-xs bg-[#1F3B2D] text-white rounded-full px-1.5 py-0.5 font-semibold min-w-[20px] text-center"></span>
           </label>
           <label class="dev-chip flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 cursor-pointer select-none transition-all border-[#1F3B2D] bg-[#E8F5EE]" data-dev="iphone">
@@ -284,7 +284,7 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
 // ===== CONSTANTS =====
 const DEV_KEYS   = ['mac','ipad','iphone','watch'];
 const DEV_LABELS = {mac:'Mac',ipad:'iPad',iphone:'iPhone',watch:'Apple Watch'};
-const DEV_ICONS  = {mac:'💻',ipad:'📲',iphone:'📱',watch:'⌚'};
+const DEV_ICONS  = {mac:'💻',ipad:'⬛️',iphone:'📱',watch:'⌚'};
 const CAT_DEV    = {'Mac':'mac','iPad':'ipad','iPhone':'iphone','Apple Watch':'watch'};
 const TRADE_DEV  = {'MacBook':'mac','iPad':'ipad','iPhone':'iphone','Apple Watch':'watch','Smart Phone':'smartphone'};
 const BRANCH_COLORS = [
