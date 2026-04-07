@@ -418,7 +418,8 @@ function devFromProduct(prod){
 }
 // Parse trade_search format (transaction-level)
 // activeDates = Set of "DD/MM/YYYY" CE strings; empty Set = no filter
-function parseTradeSearch(rows, activeDates, salesKeys){
+// empNameMap = {officerId(string) → officerName} จากไฟล์ยอดขาย (Officer ID AQ → Officer Name AR)
+function parseTradeSearch(rows, activeDates, salesKeys, empNameMap={}){
   const AGREED_STATUS=new Set([5,7]);
   const summary={};
   const byEmp={};
@@ -437,10 +438,13 @@ function parseTradeSearch(rows, activeDates, salesKeys){
     summary[branch].evaluated++;
     if(agreed)summary[branch].agreed++;
     else summary[branch].not_agreed++;
+    // รหัสพนักงานขาย อยู่ที่คอลัม GA — map ชื่อจากไฟล์ยอดขาย (Officer Name AR) ถ้า match
     const empId=s(r['รหัสพนักงานขาย']||'');
-    const empName=s(r['ชื่อพนักงานขาย']||'');
     if(empId){
-      if(!byEmp[empId])byEmp[empId]={name:empName,branch,agreed:0,evaluated:0};
+      const tradeEmpName=s(r['ชื่อพนักงานขาย']||'');
+      const salesEmpName=empNameMap[empId]||''; // ชื่อจาก 1724 (AR) ถ้า ID ตรง
+      const displayName=salesEmpName||tradeEmpName; // ใช้ชื่อจากยอดขายก่อน fallback เทรด
+      if(!byEmp[empId])byEmp[empId]={name:displayName,nameFromSales:!!salesEmpName,branch,agreed:0,evaluated:0};
       byEmp[empId].evaluated++;
       if(agreed)byEmp[empId].agreed++;
     }
@@ -465,8 +469,9 @@ async function processFiles(){
     const kCat   =findCol(sS,['Category (Name)','Category']);
     const kPType =findCol(sS,['Product Type']);
     const kQty   =findCol(sS,['Number','Qty','Quantity']);
-    const kOff   =findCol(sS,['Officer (ID)','OfficerID']);
-    const kDate  =findCol(sS,['Doc Date','DocDate','Date','วันที่']);
+    const kOff    =findCol(sS,['Officer (ID)','OfficerID']);
+    const kOffName=findCol(sS,['Officer (Name)','OfficerName','Officer Name']);
+    const kDate   =findCol(sS,['Doc Date','DocDate','Date','วันที่']);
 
     // Detect which months are present in the sales file
     const activeMths=new Set();
@@ -474,6 +479,13 @@ async function processFiles(){
       const raw=s(r[kDate]);
       const m=raw.match(/(\d{2})\/(\d{2})\/\d{4}/);
       if(m){ const mn=parseInt(m[2]); if(mn>=1&&mn<=12)activeMths.add(mn); }
+    });
+
+    // Build empNameMap: Officer(ID) → Officer(Name)  (AQ → AR)
+    const empNameMap={};
+    sRows.forEach(r=>{
+      const oid=s(r[kOff]); if(!oid)return;
+      const nm=s(r[kOffName]); if(nm&&!empNameMap[oid]) empNameMap[oid]=nm;
     });
 
     const salesByBranch={}, salesByEmp={};
@@ -506,12 +518,12 @@ async function processFiles(){
       });
 
       // กรองตามวันที่ขาย Device; ถ้าไม่มี overlap ให้ fallback แสดงข้อมูลทั้งหมด
-      let result=parseTradeSearch(tRows,activeDates,salesKeys);
+      let result=parseTradeSearch(tRows,activeDates,salesKeys,empNameMap);
       const totalFiltered=Object.values(result.summary).reduce((s,v)=>s+v.evaluated,0);
       let dateFiltered=true;
       if(totalFiltered===0&&activeDates.size>0){
         // ไม่มี overlap — fallback แสดงข้อมูลทั้งหมดในไฟล์เทรด
-        result=parseTradeSearch(tRows,new Set(),salesKeys);
+        result=parseTradeSearch(tRows,new Set(),salesKeys,empNameMap);
         dateFiltered=false;
       }
       tradeSummary=result.summary;
@@ -562,6 +574,7 @@ async function processFiles(){
       trade_format:tradeFormat,
       by_emp:byEmpTrade,
       sales_by_emp:salesByEmp,
+      emp_names:empNameMap,
       branch_amrm:branchAMRM,
       has_amrm:hasAMRM
     };
