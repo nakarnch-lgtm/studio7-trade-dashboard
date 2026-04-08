@@ -431,13 +431,20 @@ function statusCode(st){
   return 0;
 }
 // Parse ASM file → branchAMRM map: {shortBranch → {am, rm, bu, id}}
-function parseASMFile(rows, salesKeys){
+// salesBranchIdMap = {branchId(string) → branchName} — จับคู่ด้วย ID ก่อน ถ้าไม่มีจึง fallback ชื่อ
+function parseASMFile(rows, salesKeys, salesBranchIdMap={}){
   const map={};
   rows.forEach(r=>{
     const raw=s(r['Name']||r['BRANCH_NAME']||r['Branch']||'');
     if(!raw)return;
-    const short=shortBranch(raw);
-    const matched=matchBranch(short, salesKeys)||short;
+    const asmId=String(Number(s(r['ID']||''))||0);
+    let matched;
+    if(asmId&&asmId!=='0'&&salesBranchIdMap[asmId]){
+      matched=salesBranchIdMap[asmId]; // ID-based match (ใช้ชื่อจาก sales file เป็น canonical)
+    } else {
+      const short=shortBranch(raw);
+      matched=matchBranch(short, salesKeys)||short;
+    }
     map[matched]={
       am: s(r['AM']||'').trim(),
       rm: s(r['RM']||'').trim(),
@@ -465,15 +472,24 @@ function devFromProduct(prod){
 }
 // Parse trade_search format (transaction-level)
 // activeDates = Set of "DD/MM/YYYY" CE strings; empty Set = no filter
-// empNameMap = {officerId(string) → officerName} จากไฟล์ยอดขาย (Officer ID AQ → Officer Name AR)
-function parseTradeSearch(rows, activeDates, salesKeys, empNameMap={}){
+// empNameMap = {officerId(string) → officerName} จากไฟล์ยอดขาย
+// salesBranchIdMap = {branchId(string) → branchName} จับคู่ด้วย ID แทนชื่อ
+function parseTradeSearch(rows, activeDates, salesKeys, empNameMap={}, salesBranchIdMap={}){
   const AGREED_STATUS=new Set([5,7]);
   const summary={};
   const byEmp={};
   rows.forEach(r=>{
-    const rawBranch=s(r['ชื่อสาขา']||r['BRANCH_NAME']||'');
-    if(!rawBranch)return;
-    const branch=matchBranch(rawBranch,salesKeys)||rawBranch;
+    // ใช้ branch_code (ID ตัวเลข) จับคู่กับ salesBranchIdMap ก่อน เพื่อหลีกเลี่ยงปัญหาสะกดชื่อต่างกัน
+    let branch;
+    const rawCode=s(r['branch_code']||'');
+    const branchId=rawCode?String(parseInt(rawCode,10)||0):'';
+    if(branchId&&branchId!=='0'&&salesBranchIdMap[branchId]){
+      branch=salesBranchIdMap[branchId];
+    } else {
+      const rawBranch=s(r['ชื่อสาขา']||r['BRANCH_NAME']||'');
+      if(!rawBranch)return;
+      branch=matchBranch(rawBranch,salesKeys)||rawBranch;
+    }
     // date filter (CE format DD/MM/YYYY)
     if(activeDates.size>0){
       const td=s(r['วันที่คำสั่งเทรด']||'');
@@ -512,7 +528,8 @@ async function processFiles(){
     document.getElementById('loading-msg').textContent='กำลังประมวลผลข้อมูล…';
 
     const sS=sRows[0]||{};
-    const kBranch=findCol(sS,['Branch (Name)','Branch']);
+    const kBranch  =findCol(sS,['Branch (Name)','Branch']);
+    const kBranchId=findCol(sS,['Branch (ID)']);
     const kCat   =findCol(sS,['Category (Name)','Category']);
     const kPType =findCol(sS,['Product Type']);
     const kQty   =findCol(sS,['Number','Qty','Quantity']);
@@ -533,6 +550,16 @@ async function processFiles(){
     sRows.forEach(r=>{
       const oid=s(r[kOff]); if(!oid)return;
       const nm=s(r[kOffName]); if(nm&&!empNameMap[oid]) empNameMap[oid]=nm;
+    });
+
+    // สร้าง salesBranchIdMap: {branchId → shortBranchName} ใช้จับคู่ข้ามไฟล์ด้วย Branch ID
+    // แก้ปัญหาชื่อสาขาสะกดต่างกัน เช่น Lamlukka vs LumLukka
+    const salesBranchIdMap={};
+    sRows.forEach(r=>{
+      if(r[kPType]!=='Inventory Item')return;
+      const bid=String(Number(s(r[kBranchId]))||0); if(bid==='0')return;
+      const bname=shortBranch(s(r[kBranch])); if(!bname||bname==='Unknown')return;
+      if(!salesBranchIdMap[bid])salesBranchIdMap[bid]=bname;
     });
 
     const salesByBranch={}, salesByEmp={};
@@ -565,12 +592,12 @@ async function processFiles(){
       });
 
       // กรองตามวันที่ขาย Device; ถ้าไม่มี overlap ให้ fallback แสดงข้อมูลทั้งหมด
-      let result=parseTradeSearch(tRows,activeDates,salesKeys,empNameMap);
+      let result=parseTradeSearch(tRows,activeDates,salesKeys,empNameMap,salesBranchIdMap);
       const totalFiltered=Object.values(result.summary).reduce((s,v)=>s+v.evaluated,0);
       let dateFiltered=true;
       if(totalFiltered===0&&activeDates.size>0){
         // ไม่มี overlap — fallback แสดงข้อมูลทั้งหมดในไฟล์เทรด
-        result=parseTradeSearch(tRows,new Set(),salesKeys,empNameMap);
+        result=parseTradeSearch(tRows,new Set(),salesKeys,empNameMap,salesBranchIdMap);
         dateFiltered=false;
       }
       tradeSummary=result.summary;
@@ -611,7 +638,7 @@ async function processFiles(){
     if(fileASM){
       document.getElementById('loading-msg').textContent='กำลังอ่านข้อมูล AM/RM…';
       const asmRows=await readXlsx(fileASM);
-      branchAMRM=parseASMFile(asmRows, salesKeys);
+      branchAMRM=parseASMFile(asmRows, salesKeys, salesBranchIdMap);
       hasAMRM=Object.keys(branchAMRM).length>0;
     }
 
