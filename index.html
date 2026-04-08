@@ -198,6 +198,10 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
         class="px-4 py-2 rounded-xl text-sm font-bold transition-all bg-white text-gray-500 shadow-card hover:text-[#1F3B2D]">
         🃏 รายละเอียดสาขา
       </button>
+      <button id="tab-emp" onclick="switchView('emp')"
+        class="px-4 py-2 rounded-xl text-sm font-bold transition-all bg-white text-gray-500 shadow-card hover:text-[#1F3B2D]">
+        👤 รายพนักงาน
+      </button>
       <span id="period-badge" class="hidden ml-1 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">📅 เทรดเดือน: <span id="period-label"></span></span>
       <span id="format-badge" class="hidden ml-1 px-3 py-1 rounded-full text-xs font-bold bg-sky-50 text-sky-700 border border-sky-200"></span>
     </div>
@@ -287,6 +291,15 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
     <!-- ===== VIEW: DETAIL CARDS ===== -->
     <div id="view-detail" class="hidden">
       <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5" id="trade-cards"></div>
+    </div>
+
+    <!-- ===== VIEW: EMPLOYEE PERFORMANCE ===== -->
+    <div id="view-emp" class="hidden">
+      <div class="bg-white rounded-xl shadow-card overflow-x-auto" id="emp-table-wrap"></div>
+      <div class="mt-2 flex items-center gap-2 text-xs text-gray-400">
+        <div class="w-3 h-3 rounded-sm bg-red-100 border border-red-300"></div>
+        <span>ATT% ต่ำกว่า 15% — ต้องพัฒนา</span>
+      </div>
     </div>
 
     <!-- ===== VIEW: DRILL DOWN (employee breakdown for a branch) ===== -->
@@ -562,7 +575,7 @@ async function processFiles(){
       if(!salesBranchIdMap[bid])salesBranchIdMap[bid]=bname;
     });
 
-    const salesByBranch={}, salesByEmp={};
+    const salesByBranch={}, salesByEmp={}, salesEmpBranch={};
     sRows.forEach(r=>{
       if(r[kPType]!=='Inventory Item')return;
       const qty=Number(r[kQty])||0; if(qty<=0)return;
@@ -572,6 +585,11 @@ async function processFiles(){
       const oid=s(r[kOff]); if(!oid)return;
       if(!salesByEmp[oid])salesByEmp[oid]={};
       salesByEmp[oid][dev]=(salesByEmp[oid][dev]||0)+qty;
+      // บันทึกสาขาของพนักงาน (ใช้ salesBranchIdMap ถ้า Branch ID มีให้)
+      if(!salesEmpBranch[oid]){
+        const bid=String(Number(s(r[kBranchId]))||0);
+        salesEmpBranch[oid]=(bid&&bid!=='0'&&salesBranchIdMap[bid])?salesBranchIdMap[bid]:branch;
+      }
     });
 
     const THAI_MTH=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
@@ -649,6 +667,7 @@ async function processFiles(){
       by_emp:byEmpTrade,
       sales_by_emp:salesByEmp,
       emp_names:empNameMap,
+      emp_branch:salesEmpBranch,
       branch_amrm:branchAMRM,
       has_amrm:hasAMRM
     };
@@ -775,12 +794,14 @@ function switchView(v){
   currentView = v;
   document.getElementById('view-summary').classList.toggle('hidden', v!=='summary');
   document.getElementById('view-detail').classList.toggle('hidden', v!=='detail');
+  document.getElementById('view-emp').classList.toggle('hidden', v!=='emp');
   document.getElementById('view-drill').classList.toggle('hidden', v!=='drill');
-  const activeClass='px-4 py-2 rounded-xl text-sm font-bold transition-all bg-[#1F3B2D] text-white shadow-card';
-  const inactiveClass='px-4 py-2 rounded-xl text-sm font-bold transition-all bg-white text-gray-500 shadow-card hover:text-[#1F3B2D]';
-  const tS=document.getElementById('tab-summary'), tD=document.getElementById('tab-detail');
-  tS.className = v==='summary' ? activeClass : inactiveClass;
-  tD.className = v==='detail'  ? activeClass : inactiveClass;
+  const A='px-4 py-2 rounded-xl text-sm font-bold transition-all bg-[#1F3B2D] text-white shadow-card';
+  const I='px-4 py-2 rounded-xl text-sm font-bold transition-all bg-white text-gray-500 shadow-card hover:text-[#1F3B2D]';
+  document.getElementById('tab-summary').className = v==='summary'?A:I;
+  document.getElementById('tab-detail').className  = v==='detail'?A:I;
+  document.getElementById('tab-emp').className     = v==='emp'?A:I;
+  if(v==='emp'&&DATA) renderEmpSummary(getSelDevs(), getAMRMBranches());
 }
 
 // ===== BRANCH CHECKBOX DROPDOWN =====
@@ -964,6 +985,85 @@ function renderSummary(sorted, devs){
   }).join('');
 }
 
+// ===== EMPLOYEE PERFORMANCE TABLE =====
+function renderEmpSummary(devs, amrmBranches){
+  const wrap=document.getElementById('emp-table-wrap');
+  if(!wrap||!DATA)return;
+
+  // รวม empIds จาก sales_by_emp (ทุกคนที่ขาย Device อย่างน้อย 1 ชิ้น)
+  const empList=Object.keys(DATA.sales_by_emp).map(empId=>{
+    // branch: ใช้จาก by_emp (trade) หรือ emp_branch (sales) หรือ Unknown
+    const branch=DATA.by_emp[empId]?.branch||DATA.emp_branch[empId]||'Unknown';
+    // กรองตาม filter BU/RM/AM/Branch
+    if(amrmBranches&&!amrmBranches.has(branch))return null;
+    const name=DATA.by_emp[empId]?.name||DATA.emp_names[empId]||empId;
+    const perDev={};
+    devs.forEach(d=>{ perDev[d]=(DATA.sales_by_emp[empId]||{})[d]||0; });
+    const devSold=devs.reduce((s,d)=>s+perDev[d],0);
+    const agreed=DATA.by_emp[empId]?.agreed||0;
+    const evaluated=DATA.by_emp[empId]?.evaluated||0;
+    const attP=pct(agreed,devSold);
+    return{empId,name,branch,perDev,devSold,agreed,evaluated,attP};
+  }).filter(Boolean).sort((a,b)=>b.attP-a.attP||b.agreed-a.agreed||b.devSold-a.devSold);
+
+  if(empList.length===0){
+    wrap.innerHTML='<div class="py-14 text-center text-gray-400 text-sm">ไม่มีข้อมูลพนักงานในช่วงที่เลือก</div>';
+    return;
+  }
+
+  const devHeads=devs.map(d=>`<th class="px-1 py-2.5 text-center text-xs font-bold w-10 whitespace-nowrap">${DEV_ICONS[d]}<br><span class="font-normal text-white/60 text-[9px]">${DEV_LABELS[d]}</span></th>`).join('');
+
+  const rows=empList.map((e,i)=>{
+    const danger=e.attP<15&&e.devSold>0;
+    const rowBg=danger?'bg-red-50 hover:bg-red-100':(i%2===0?'bg-white hover:bg-gray-50':'bg-gray-50/60 hover:bg-gray-100');
+    const attColor=danger?'text-red-600 font-black':(e.attP>=60?'text-emerald-600 font-black':'text-amber-600 font-black');
+    const barColor=danger?'bg-red-400':(e.attP>=60?'bg-emerald-500':e.attP>=40?'bg-amber-400':'bg-orange-400');
+    const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+    const rankNum=danger
+      ?`<span class="inline-flex w-6 h-6 rounded-full bg-red-500 text-white items-center justify-center text-xs font-black">${i+1}</span>`
+      :`<span class="text-gray-400 font-bold">${medal||i+1}</span>`;
+    const bn=e.branch==='Unknown'?'ไม่ระบุสาขา':e.branch;
+    const devCells=devs.map(d=>`<td class="px-1 py-2 text-center text-sm font-semibold text-gray-700">${e.perDev[d]||'–'}</td>`).join('');
+    const attDisplay=e.devSold>0?e.attP+'%':'–';
+    return`<tr class="${rowBg} border-b border-gray-100 transition-colors">
+      <td class="px-1 py-2 text-center">${rankNum}</td>
+      <td class="px-2 py-2 overflow-hidden max-w-[120px]">
+        <div class="font-bold text-gray-800 text-sm leading-tight truncate" title="${e.name}">${e.name}</div>
+        ${danger?'<div class="text-[10px] text-red-500 font-bold">⚠ ต่ำกว่าเป้า 15%</div>':''}
+      </td>
+      <td class="px-2 py-2 hidden md:table-cell max-w-[160px]">
+        <div class="text-xs text-gray-500 truncate" title="${bn}">${bn}</div>
+      </td>
+      ${devCells}
+      <td class="px-1 py-2 text-center text-sm font-bold text-[#9E7A3F]">${e.devSold||'–'}</td>
+      <td class="px-1 py-2 text-center text-base font-black text-emerald-600">${e.agreed}</td>
+      <td class="px-1 py-2 min-w-[90px]">
+        <div class="flex items-center gap-1">
+          <div class="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden min-w-[36px]">
+            ${e.devSold>0?`<div class="fill-bar h-full rounded-full ${barColor}" style="width:${Math.min(e.attP,100)}%"></div>`:''}
+          </div>
+          <span class="w-10 text-right text-sm font-black ${attColor}">${attDisplay}</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  wrap.innerHTML=`<table class="w-full table-auto">
+    <thead>
+      <tr class="bg-[#1F3B2D] text-white">
+        <th class="px-1 py-2.5 text-center text-xs font-bold uppercase tracking-wide w-7">#</th>
+        <th class="px-2 py-2.5 text-left text-sm font-bold">ชื่อพนักงาน</th>
+        <th class="px-2 py-2.5 text-left text-xs font-bold hidden md:table-cell">สาขา</th>
+        ${devHeads}
+        <th class="px-1 py-2.5 text-center text-xs font-bold w-10">รวม<br><span class="font-normal text-white/60 text-[9px]">ขาย</span></th>
+        <th class="px-1 py-2.5 text-center text-xs font-bold w-12">ตกลง<br><span class="font-normal text-white/60 text-[9px]">เทรด</span></th>
+        <th class="px-1 py-2.5 text-center text-xs font-bold w-[108px]">ATT%</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
 // ===== HELPERS =====
 function pct(a,b){ return b>0?Math.round(a/b*100):0; }
 function attStyle(p){
@@ -1071,6 +1171,7 @@ function render(){
   const sorted=branches.map(b=>({b,att:pct(sumAllTrades(b).agreed,sumSales(b,devs))})).sort((a,b_)=>b_.att-a.att);
 
   renderSummary(sorted, devs);
+  if(currentView==='emp') renderEmpSummary(devs, amrmBranches);
 
   document.getElementById('trade-cards').innerHTML=sorted.map(({b:branch},bi)=>{
     const salesTotal=sumSales(branch,devs);
