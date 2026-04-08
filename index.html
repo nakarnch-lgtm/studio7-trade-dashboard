@@ -487,7 +487,9 @@ function devFromProduct(prod){
 // activeDates = Set of "DD/MM/YYYY" CE strings; empty Set = no filter
 // empNameMap = {officerId(string) → officerName} จากไฟล์ยอดขาย
 // salesBranchIdMap = {branchId(string) → branchName} จับคู่ด้วย ID แทนชื่อ
-function parseTradeSearch(rows, activeDates, salesKeys, empNameMap={}, salesBranchIdMap={}){
+// billToEmp = {billNo(string) → {empId,name,branch}} lookup จากเลขบิล Sales คอลัม Q
+// tBillCol = ชื่อ header ของคอลัม IT ในไฟล์เทรด (เลขบิลขาย)
+function parseTradeSearch(rows, activeDates, salesKeys, empNameMap={}, salesBranchIdMap={}, billToEmp={}, tBillCol=null){
   const AGREED_STATUS=new Set([5,7]);
   const summary={};
   const byEmp={};
@@ -514,13 +516,27 @@ function parseTradeSearch(rows, activeDates, salesKeys, empNameMap={}, salesBran
     summary[branch].evaluated++;
     if(agreed)summary[branch].agreed++;
     else summary[branch].not_agreed++;
-    // รหัสพนักงานขาย อยู่ที่คอลัม GA — map ชื่อจากไฟล์ยอดขาย (Officer Name AR) ถ้า match
-    const empId=s(r['รหัสพนักงานขาย']||'');
-    if(empId){
+
+    // === Lookup พนักงานจากเลขบิลขาย (คอลัม IT ของ trade = คอลัม Q ของ 1724) ===
+    // ถ้า lookup ได้ → ใช้ข้อมูลจากไฟล์ยอดขายแทน (แก้ปัญหากรอกรหัสพนักงานผิด)
+    const billNo=tBillCol?s(r[tBillCol]||''):'';
+    const billMatch=billNo?billToEmp[billNo]:null;
+
+    let empId, displayName, empBranch;
+    if(billMatch){
+      empId=billMatch.empId;
+      displayName=billMatch.name;
+      empBranch=billMatch.branch||branch;
+    } else {
+      empId=s(r['รหัสพนักงานขาย']||'');
       const tradeEmpName=s(r['ชื่อพนักงานขาย']||'');
-      const salesEmpName=empNameMap[empId]||''; // ชื่อจาก 1724 (AR) ถ้า ID ตรง
-      const displayName=salesEmpName||tradeEmpName; // ใช้ชื่อจากยอดขายก่อน fallback เทรด
-      if(!byEmp[empId])byEmp[empId]={name:displayName,nameFromSales:!!salesEmpName,branch,agreed:0,evaluated:0};
+      const salesEmpName=empId?empNameMap[empId]||'':'';
+      displayName=salesEmpName||tradeEmpName;
+      empBranch=branch;
+    }
+
+    if(empId){
+      if(!byEmp[empId])byEmp[empId]={name:displayName,nameFromSales:!!billMatch,branch:empBranch,agreed:0,evaluated:0};
       byEmp[empId].evaluated++;
       if(agreed)byEmp[empId].agreed++;
     }
@@ -549,6 +565,8 @@ async function processFiles(){
     const kOff    =findCol(sS,['Officer (ID)','OfficerID']);
     const kOffName=findCol(sS,['Officer (Name)','OfficerName','Officer Name']);
     const kDate   =findCol(sS,['Doc Date','DocDate','Date','วันที่']);
+    // คอลัม Q (index 16) ในไฟล์ยอดขาย = เลขที่บิล สำหรับ lookup ข้ามไฟล์เทรด
+    const sBillCol=Object.keys(sS)[16]??null;
 
     // Detect which months are present in the sales file
     const activeMths=new Set();
@@ -575,6 +593,22 @@ async function processFiles(){
       if(!salesBranchIdMap[bid])salesBranchIdMap[bid]=bname;
     });
 
+    // Build billToEmp: {billNo → {empId, name, branch}} จากคอลัม Q (sBillCol) ของ sales
+    // ใช้ lookup ข้ามไฟล์เทรดเมื่อพนักงานกรอกรหัสผิด
+    const billToEmp={};
+    if(sBillCol){
+      sRows.forEach(r=>{
+        if(r[kPType]!=='Inventory Item')return;
+        const bill=s(r[sBillCol]); if(!bill)return;
+        const oid=s(r[kOff]); if(!oid)return;
+        if(billToEmp[bill])return; // first row wins
+        const nm=empNameMap[oid]||s(r[kOffName]||'');
+        const bid=String(Number(s(r[kBranchId]))||0);
+        const branch=(bid&&bid!=='0'&&salesBranchIdMap[bid])?salesBranchIdMap[bid]:shortBranch(s(r[kBranch]));
+        billToEmp[bill]={empId:oid,name:nm,branch};
+      });
+    }
+
     const salesByBranch={}, salesByEmp={}, salesEmpBranch={};
     sRows.forEach(r=>{
       if(r[kPType]!=='Inventory Item')return;
@@ -596,6 +630,9 @@ async function processFiles(){
     const salesKeys=Object.keys(salesByBranch);
     const tradeFormat=detectTradeFormat(tRows);
     let tradeSummary={}, byEmpTrade={};
+    // คอลัม IT (index 253, 0-based) ในไฟล์เทรด = เลขที่บิลขาย สำหรับ lookup billToEmp
+    const tKeys=tRows.length>0?Object.keys(tRows[0]):[];
+    const tBillCol=tKeys.length>253?tKeys[253]:null;
 
     if(tradeFormat==='search'){
       // แปลงวันที่จากไฟล์ยอดขาย: BE → CE (DD/MM/YYYY CE)
@@ -610,12 +647,12 @@ async function processFiles(){
       });
 
       // กรองตามวันที่ขาย Device; ถ้าไม่มี overlap ให้ fallback แสดงข้อมูลทั้งหมด
-      let result=parseTradeSearch(tRows,activeDates,salesKeys,empNameMap,salesBranchIdMap);
+      let result=parseTradeSearch(tRows,activeDates,salesKeys,empNameMap,salesBranchIdMap,billToEmp,tBillCol);
       const totalFiltered=Object.values(result.summary).reduce((s,v)=>s+v.evaluated,0);
       let dateFiltered=true;
       if(totalFiltered===0&&activeDates.size>0){
         // ไม่มี overlap — fallback แสดงข้อมูลทั้งหมดในไฟล์เทรด
-        result=parseTradeSearch(tRows,new Set(),salesKeys,empNameMap,salesBranchIdMap);
+        result=parseTradeSearch(tRows,new Set(),salesKeys,empNameMap,salesBranchIdMap,billToEmp,tBillCol);
         dateFiltered=false;
       }
       tradeSummary=result.summary;
