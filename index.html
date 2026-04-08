@@ -988,10 +988,8 @@ function renderSummary(sorted, devs){
     return `<tr class="${rowBg} border-b border-gray-100 transition-colors">
       <td class="px-1 py-2 text-center">${rankNum}</td>
       <td class="px-2 py-2 overflow-hidden">
-        <div class="flex items-center gap-1 min-w-0">
-          <span class="font-bold text-gray-800 text-sm leading-tight truncate" title="${bn}">${bn}</span>
-          ${danger?'<span class="shrink-0 text-[8px] text-red-500 font-bold leading-none whitespace-nowrap">⚠&lt;15%</span>':''}
-        </div>
+        <div class="font-bold text-gray-800 text-sm leading-tight truncate" title="${bn}">${bn}</div>
+        ${danger?'<div class="text-xs text-red-500 font-bold mt-0.5">⚠ ต่ำกว่าเป้า 15%</div>':''}
       </td>
       <td class="px-1 py-2 text-center text-base font-black text-emerald-600">${agreed}</td>
       <td class="px-1 py-2 text-center text-sm text-gray-500">${trTotal}</td>
@@ -1066,10 +1064,8 @@ function renderEmpPage(page){
     return`<tr class="${rowBg} border-b border-gray-100 transition-colors">
       <td class="px-1 py-2 text-center">${rankNum}</td>
       <td class="px-2 py-2 overflow-hidden max-w-[120px]">
-        <div class="flex items-center gap-1 min-w-0">
-          <span class="font-bold text-gray-800 text-sm leading-tight truncate" title="${e.name}">${e.name}</span>
-          ${danger?'<span class="shrink-0 text-[8px] text-red-500 font-bold leading-none whitespace-nowrap">⚠&lt;15%</span>':''}
-        </div>
+        <div class="font-bold text-gray-800 text-sm leading-tight truncate" title="${e.name}">${e.name}</div>
+        ${danger?'<div class="text-xs text-red-500 font-bold mt-0.5">⚠ ต่ำกว่าเป้า 15%</div>':''}
       </td>
       <td class="px-2 py-2 hidden md:table-cell max-w-[160px]">
         <div class="text-xs text-gray-500 truncate" title="${bn}">${bn}</div>
