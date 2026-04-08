@@ -232,9 +232,20 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
           </div>
           <div class="flex items-center gap-1.5">
             <label class="text-xs text-gray-500 font-semibold">สาขา:</label>
-            <select id="filter-branch" onchange="onAMRMChange()" class="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#1F3B2D] max-w-[180px]">
-              <option value="">สาขาทั้งหมด</option>
-            </select>
+            <div class="relative" id="branch-filter-wrap">
+              <button type="button" id="branch-filter-btn" onclick="toggleBranchDropdown(event)"
+                class="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 font-medium flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-[#1F3B2D] min-w-[120px]">
+                <span id="branch-filter-label">สาขาทั้งหมด</span>
+                <svg class="w-3 h-3 text-gray-400 ml-auto shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+              </button>
+              <div id="branch-dropdown" class="hidden absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 w-64 flex flex-col" style="max-height:280px">
+                <div class="px-3 py-2 border-b border-gray-100 flex items-center gap-2 shrink-0">
+                  <input type="checkbox" id="branch-check-all" checked onchange="toggleAllBranches(this)">
+                  <label for="branch-check-all" class="text-xs font-bold text-gray-600 cursor-pointer select-none">เลือกทั้งหมด</label>
+                </div>
+                <div id="branch-checkbox-list" class="overflow-y-auto py-1"></div>
+              </div>
+            </div>
           </div>
           <button onclick="resetAMRM()" class="text-xs text-gray-400 hover:text-gray-600 underline">รีเซ็ต</button>
         </div>
@@ -277,6 +288,28 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
     <div id="view-detail" class="hidden">
       <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5" id="trade-cards"></div>
     </div>
+
+    <!-- ===== VIEW: DRILL DOWN (employee breakdown for a branch) ===== -->
+    <div id="view-drill" class="hidden">
+      <div class="bg-white rounded-xl shadow-card px-5 py-4 mb-4 flex items-center gap-3 flex-wrap">
+        <button onclick="closeDrill()" class="flex items-center gap-1.5 text-sm font-semibold text-gray-600 hover:text-[#1F3B2D] transition-colors shrink-0">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+          กลับ
+        </button>
+        <div class="w-px h-5 bg-gray-200 shrink-0"></div>
+        <span class="text-xl shrink-0">🏬</span>
+        <span id="drill-branch-title" class="font-bold text-gray-800 text-sm"></span>
+        <div class="ml-auto flex items-center gap-3">
+          <div class="text-right">
+            <div class="text-xs text-gray-400 font-medium">ATT%</div>
+            <div id="drill-branch-att" class="text-2xl font-black"></div>
+          </div>
+        </div>
+      </div>
+      <div class="bg-white rounded-xl shadow-card overflow-x-auto">
+        <div id="drill-emp-table"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -300,6 +333,14 @@ const BRANCH_COLORS = [
 ];
 
 let DATA = null, fileSales = null, fileTrade = null, fileASM = null, DATA_MONTHS = '';
+let DRILL_BRANCH = null;
+let SELECTED_BRANCHES = new Set(); // empty = all; หรือ Set ของ branch ที่เลือก
+
+// ปิด branch dropdown เมื่อคลิกนอก
+document.addEventListener('click', e=>{
+  const wrap=document.getElementById('branch-filter-wrap');
+  if(wrap&&!wrap.contains(e.target)) document.getElementById('branch-dropdown')?.classList.add('hidden');
+});
 
 // ===== DRAG & DROP =====
 function onDragOver(e,id){ e.preventDefault(); document.getElementById(id).classList.add('drag-over'); }
@@ -615,13 +656,8 @@ function showDashboard(){
   // AM/RM filter + Branch filter
   const amrmFilter=document.getElementById('amrm-filter');
   const amrmPlaceholder=document.getElementById('amrm-placeholder');
-  // Populate branch dropdown (always available when data is loaded)
-  const allBranchKeys=new Set([
-    ...Object.keys(DATA&&DATA.trade_summary||{}),
-    ...Object.keys(DATA&&DATA.sales_by_branch||{})
-  ]);
-  const branchSel=document.getElementById('filter-branch');
-  if(branchSel) branchSel.innerHTML='<option value="">สาขาทั้งหมด</option>'+[...allBranchKeys].sort().map(v=>`<option value="${v}">${v}</option>`).join('');
+  // Populate branch checkbox dropdown
+  SELECTED_BRANCHES.clear();
   if(DATA&&DATA.has_amrm){
     const rms=new Set(), ams=new Set(), bus=new Set();
     Object.values(DATA.branch_amrm).forEach(v=>{
@@ -645,36 +681,53 @@ function showDashboard(){
     amrmFilter.classList.add('hidden');
     amrmPlaceholder.classList.remove('hidden');
   }
+  updateBranchCheckboxes();
   updateChips(); render();
 }
-function onAMRMChange(){ render(); }
-// กรองสาขาตาม BU/RM/AM/Branch (branch-level จากไฟล์ ASM + branch filter ใช้ได้เสมอ)
+function onAMRMChange(){
+  // เมื่อ BU/RM/AM เปลี่ยน → reset branch selection แล้ว update list
+  SELECTED_BRANCHES.clear();
+  updateBranchCheckboxes();
+  render();
+}
+// กรองสาขาตาม BU/RM/AM + SELECTED_BRANCHES checkbox
 function getAMRMBranches(){
   if(!DATA)return null; // null = ไม่กรอง
   const bu=document.getElementById('filter-bu')?.value||'';
   const rm=document.getElementById('filter-rm')?.value||'';
   const am=document.getElementById('filter-am')?.value||'';
-  const br=document.getElementById('filter-branch')?.value||'';
-  if(!bu&&!rm&&!am&&!br)return null;
-  // กรองด้วย branch เดียวโดยไม่ต้องมี ASM
-  if(br&&!bu&&!rm&&!am)return new Set([br]);
-  // กรองด้วย BU/RM/AM ต้องมีไฟล์ ASM
-  if(!DATA.has_amrm)return br?new Set([br]):null;
-  const matched=new Set();
-  Object.entries(DATA.branch_amrm).forEach(([branch,v])=>{
-    if(bu&&v.bu!==bu)return;
-    if(rm&&v.rm!==rm)return;
-    if(am&&v.am!==am)return;
-    matched.add(branch);
-  });
-  // ถ้าเลือก branch เพิ่มเติม → กรองให้เหลือเฉพาะสาขานั้น
-  if(br) return matched.has(br)?new Set([br]):new Set(['__no_match__']);
-  return matched.size>0?matched:new Set(['__no_match__']);
+  const hasBUAMAM=!!(bu||rm||am);
+  const hasBranchSel=SELECTED_BRANCHES.size>0;
+  if(!hasBUAMAM&&!hasBranchSel)return null;
+  // branch checkbox = __none__ → ไม่มีสาขาตรง
+  if(SELECTED_BRANCHES.has('__none__'))return new Set(['__no_match__']);
+  // กรอง BU/RM/AM จาก ASM
+  let matched=null;
+  if(hasBUAMAM&&DATA.has_amrm){
+    matched=new Set();
+    Object.entries(DATA.branch_amrm).forEach(([branch,v])=>{
+      if(bu&&v.bu!==bu)return;
+      if(rm&&v.rm!==rm)return;
+      if(am&&v.am!==am)return;
+      matched.add(branch);
+    });
+  }
+  if(hasBranchSel){
+    // intersect matched กับ SELECTED_BRANCHES
+    if(matched){
+      const intersect=new Set([...matched].filter(b=>SELECTED_BRANCHES.has(b)));
+      return intersect.size>0?intersect:new Set(['__no_match__']);
+    }
+    return new Set(SELECTED_BRANCHES);
+  }
+  return matched&&matched.size>0?matched:new Set(['__no_match__']);
 }
 function resetAMRM(){
-  ['filter-bu','filter-rm','filter-am','filter-branch'].forEach(id=>{
+  ['filter-bu','filter-rm','filter-am'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
+  SELECTED_BRANCHES.clear();
+  updateBranchCheckboxes();
   render();
 }
 
@@ -693,16 +746,149 @@ function resetDashboard(){
 let currentView = 'summary';
 function switchView(v){
   currentView = v;
-  const isSummary = v==='summary';
-  document.getElementById('view-summary').classList.toggle('hidden', !isSummary);
-  document.getElementById('view-detail').classList.toggle('hidden', isSummary);
+  document.getElementById('view-summary').classList.toggle('hidden', v!=='summary');
+  document.getElementById('view-detail').classList.toggle('hidden', v!=='detail');
+  document.getElementById('view-drill').classList.toggle('hidden', v!=='drill');
+  const activeClass='px-4 py-2 rounded-xl text-sm font-bold transition-all bg-[#1F3B2D] text-white shadow-card';
+  const inactiveClass='px-4 py-2 rounded-xl text-sm font-bold transition-all bg-white text-gray-500 shadow-card hover:text-[#1F3B2D]';
   const tS=document.getElementById('tab-summary'), tD=document.getElementById('tab-detail');
-  tS.className = isSummary
-    ? 'px-4 py-2 rounded-xl text-sm font-bold transition-all bg-[#1F3B2D] text-white shadow-card'
-    : 'px-4 py-2 rounded-xl text-sm font-bold transition-all bg-white text-gray-500 shadow-card hover:text-[#1F3B2D]';
-  tD.className = !isSummary
-    ? 'px-4 py-2 rounded-xl text-sm font-bold transition-all bg-[#1F3B2D] text-white shadow-card'
-    : 'px-4 py-2 rounded-xl text-sm font-bold transition-all bg-white text-gray-500 shadow-card hover:text-[#1F3B2D]';
+  tS.className = v==='summary' ? activeClass : inactiveClass;
+  tD.className = v==='detail'  ? activeClass : inactiveClass;
+}
+
+// ===== BRANCH CHECKBOX DROPDOWN =====
+function toggleBranchDropdown(e){
+  e.stopPropagation();
+  document.getElementById('branch-dropdown').classList.toggle('hidden');
+}
+
+function updateBranchCheckboxes(){
+  if(!DATA) return;
+  const bu=document.getElementById('filter-bu')?.value||'';
+  const rm=document.getElementById('filter-rm')?.value||'';
+  const am=document.getElementById('filter-am')?.value||'';
+  // ถ้ามี BU/RM/AM → แสดงเฉพาะสาขาในกลุ่มนั้น; ไม่มี → แสดงทั้งหมด
+  let listBranches;
+  if((bu||rm||am)&&DATA.has_amrm){
+    listBranches=new Set();
+    Object.entries(DATA.branch_amrm).forEach(([b,v])=>{
+      if(bu&&v.bu!==bu)return;
+      if(rm&&v.rm!==rm)return;
+      if(am&&v.am!==am)return;
+      listBranches.add(b);
+    });
+  } else {
+    listBranches=new Set([...Object.keys(DATA.trade_summary||{}),...Object.keys(DATA.sales_by_branch||{})]);
+  }
+  const list=document.getElementById('branch-checkbox-list');
+  if(!list) return;
+  list.innerHTML=[...listBranches].sort().map(b=>{
+    const checked=SELECTED_BRANCHES.size===0||SELECTED_BRANCHES.has(b)?'checked':'';
+    return`<label class="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer select-none">
+      <input type="checkbox" class="branch-cb" value="${b}" ${checked} onchange="onBranchCheckChange()">
+      <span class="text-xs text-gray-700 truncate" title="${b}">${b}</span>
+    </label>`;
+  }).join('');
+  updateBranchFilterLabel();
+}
+
+function toggleAllBranches(masterCb){
+  document.querySelectorAll('.branch-cb').forEach(cb=>{ cb.checked=masterCb.checked; });
+  SELECTED_BRANCHES.clear();
+  if(!masterCb.checked){
+    // ไม่เลือกเลย → ใส่ __none__ เพื่อให้ไม่แสดงผล
+    SELECTED_BRANCHES.add('__none__');
+  }
+  updateBranchFilterLabel();
+  render();
+}
+
+function onBranchCheckChange(){
+  const all=document.querySelectorAll('.branch-cb');
+  const checked=document.querySelectorAll('.branch-cb:checked');
+  SELECTED_BRANCHES.clear();
+  if(checked.length===all.length){
+    // ทั้งหมด → clear = no filter
+  } else {
+    checked.forEach(cb=>SELECTED_BRANCHES.add(cb.value));
+    if(SELECTED_BRANCHES.size===0) SELECTED_BRANCHES.add('__none__');
+  }
+  const allCb=document.getElementById('branch-check-all');
+  if(allCb) allCb.checked=(checked.length===all.length);
+  updateBranchFilterLabel();
+  render();
+}
+
+function updateBranchFilterLabel(){
+  const lbl=document.getElementById('branch-filter-label');
+  if(!lbl) return;
+  if(SELECTED_BRANCHES.size===0) lbl.textContent='สาขาทั้งหมด';
+  else if(SELECTED_BRANCHES.has('__none__')) lbl.textContent='(ไม่มีสาขา)';
+  else lbl.textContent=SELECTED_BRANCHES.size+' สาขา';
+}
+
+// ===== DRILL-DOWN: EMPLOYEE VIEW =====
+function drillDown(branch){
+  if(!DATA) return;
+  DRILL_BRANCH=branch;
+  const devs=getSelDevs();
+  const salesTotal=sumSales(branch,devs);
+  const{agreed,evaluated:trTotal}=sumAllTrades(branch);
+  const attP=pct(agreed,salesTotal);
+  const bn=branch==='Unknown'?'ไม่ระบุสาขา':branch;
+  const headerBg=attP<15?'#CA3433':'#50C878';
+
+  document.getElementById('drill-branch-title').textContent=bn;
+  const attEl=document.getElementById('drill-branch-att');
+  attEl.textContent=attP+'%';
+  attEl.style.color=headerBg;
+
+  const branchEmps=Object.entries(DATA.by_emp||{})
+    .filter(([,v])=>v.branch===branch)
+    .map(([empId,v])=>{
+      const perDev={};
+      devs.forEach(d=>{ perDev[d]=(DATA.sales_by_emp[empId]||{})[d]||0; });
+      const devSold=devs.reduce((s,d)=>s+perDev[d],0);
+      const empAtt=pct(v.agreed,devSold);
+      return{empId,name:v.name,agreed:v.agreed,evaluated:v.evaluated,devSold,empAtt,perDev};
+    })
+    .sort((a,b)=>b.empAtt-a.empAtt||b.agreed-a.agreed);
+
+  const devHeads=devs.map(d=>`<th class="px-2 py-2.5 text-center text-xs font-bold w-12">${DEV_ICONS[d]}<br><span class="font-normal text-white/70 text-[10px]">${DEV_LABELS[d]}</span></th>`).join('');
+  const rows=branchEmps.length>0?branchEmps.map((e,i)=>{
+    const attColor=e.empAtt>=60?'text-emerald-600 font-black':e.empAtt>=40?'text-amber-600 font-black':e.empAtt>0?'text-red-500 font-black':'text-gray-400 font-semibold';
+    const rowBg=i%2===0?'bg-white':'bg-gray-50/60';
+    const devCells=devs.map(d=>`<td class="px-2 py-2 text-center text-sm font-semibold text-gray-700">${e.perDev[d]||'–'}</td>`).join('');
+    return`<tr class="${rowBg} hover:bg-blue-50/50 transition-colors">
+      <td class="px-2 py-2 text-center text-xs text-gray-400 font-semibold">${i+1}</td>
+      <td class="px-3 py-2 font-semibold text-sm text-gray-800 max-w-[120px] truncate" title="${e.name||e.empId}">${e.name||e.empId}</td>
+      ${devCells}
+      <td class="px-2 py-2 text-center text-sm font-bold text-[#1F3B2D]">${e.devSold||'–'}</td>
+      <td class="px-2 py-2 text-center text-sm font-bold text-emerald-600">${e.agreed}</td>
+      <td class="px-2 py-2 text-center text-sm ${attColor}">${e.devSold>0?e.empAtt+'%':'–'}</td>
+    </tr>`;
+  }).join(''):`<tr><td colspan="${4+devs.length}" class="py-10 text-center text-gray-400 text-sm">ไม่มีข้อมูลพนักงาน</td></tr>`;
+
+  document.getElementById('drill-emp-table').innerHTML=`
+    <table class="w-full table-auto">
+      <thead>
+        <tr class="bg-[#1F3B2D] text-white">
+          <th class="px-2 py-2.5 text-center text-xs font-bold w-7">#</th>
+          <th class="px-3 py-2.5 text-left text-sm font-bold">ชื่อพนักงาน</th>
+          ${devHeads}
+          <th class="px-2 py-2.5 text-center text-xs font-bold w-16">รวม<br><span class="font-normal text-white/70">Device</span></th>
+          <th class="px-2 py-2.5 text-center text-xs font-bold w-14">ตกลง<br><span class="font-normal text-white/70">เทรด</span></th>
+          <th class="px-2 py-2.5 text-center text-xs font-bold w-16">ATT%</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  switchView('drill');
+}
+
+function closeDrill(){
+  DRILL_BRANCH=null;
+  switchView('detail');
 }
 
 function renderSummary(sorted, devs){
@@ -877,51 +1063,10 @@ function render(){
       </div>`;
     }).join('');
 
-    // Employee breakdown: employees with trade activity in this branch
-    const branchEmps=Object.entries(DATA.by_emp||{})
-      .filter(([,v])=>v.branch===branch)
-      .map(([empId,v])=>{
-        const devSold=sumEmpSales(empId,devs);
-        const empAtt=pct(v.agreed,devSold);
-        return{empId,name:v.name,agreed:v.agreed,evaluated:v.evaluated,devSold,empAtt};
-      })
-      .sort((a,b)=>b.empAtt-a.empAtt||b.agreed-a.agreed);
-    const empRowsHtml=branchEmps.length>0?`
-      <div class="pt-2 border-t border-gray-100">
-        <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1">
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0"/></svg>
-          รายพนักงาน (${branchEmps.length} คน)
-        </div>
-        <div class="overflow-x-auto">
-        <table class="w-full text-xs">
-          <thead>
-            <tr class="text-[10px] text-gray-400 font-semibold border-b border-gray-100">
-              <th class="text-left pb-1.5 pr-2">ชื่อพนักงาน</th>
-              <th class="text-center pb-1.5 px-1">Device<br><span class="font-normal text-gray-300">ขาย</span></th>
-              <th class="text-center pb-1.5 px-1">ตกลง<br><span class="font-normal text-gray-300">เทรด</span></th>
-              <th class="text-center pb-1.5 px-1">ยอด<br><span class="font-normal text-gray-300">ประเมิน</span></th>
-              <th class="text-center pb-1.5 pl-1">ATT%</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${branchEmps.map(e=>{
-              const as2=attStyle(e.empAtt);
-              const bg=e.empAtt>=60?'text-emerald-600':e.empAtt>=40?'text-amber-600':e.empAtt>0?'text-red-500':'text-gray-400';
-              return`<tr class="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                <td class="py-1.5 pr-2 font-medium text-gray-700 max-w-[100px] truncate" title="${e.name}">${e.name||e.empId}</td>
-                <td class="text-center px-1 font-semibold text-[#9E7A3F]">${e.devSold>0?e.devSold:'–'}</td>
-                <td class="text-center px-1 font-bold text-emerald-600">${e.agreed}</td>
-                <td class="text-center px-1 text-gray-500">${e.evaluated}</td>
-                <td class="text-center pl-1 font-black text-sm ${bg}">${e.devSold>0?e.empAtt+'%':'–'}</td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
-        </div>
-      </div>`:'';
+    // นับพนักงานในสาขา
+    const empCount=Object.values(DATA.by_emp||{}).filter(v=>v.branch===branch).length;
 
-
-    return`<div class="bg-white rounded-2xl shadow-card hover:shadow-card-lg transition-shadow duration-300 overflow-hidden">
+    return`<div class="bg-white rounded-2xl shadow-card hover:shadow-card-lg transition-shadow duration-300 overflow-hidden cursor-pointer group" onclick="drillDown('${branch.replace(/'/g,"\\'")}')">
       <div class="px-5 py-4 flex items-center justify-between" style="background:${headerBg}">
         <div class="flex items-center gap-3 min-w-0">
           <span class="text-2xl">🏬</span>
@@ -953,7 +1098,10 @@ function render(){
         ${devRows?`<div class="pt-1 border-t border-gray-100">
           <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5">ยอดขาย Device ที่เลือก</div>
           <div class="flex flex-col gap-2">${devRows}</div></div>`:''}
-        ${empRowsHtml}
+        <div class="pt-2 border-t border-gray-100 flex items-center justify-between text-xs text-gray-400">
+          <span>${empCount>0?`👥 ${empCount} พนักงาน`:'ไม่มีข้อมูลพนักงาน'}</span>
+          <span class="flex items-center gap-1 text-[#1F3B2D] font-semibold group-hover:gap-2 transition-all">ดูรายพนักงาน <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg></span>
+        </div>
       </div>
     </div>`;
   }).join('');
