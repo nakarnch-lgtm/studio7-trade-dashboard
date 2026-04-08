@@ -1027,8 +1027,9 @@ function renderEmpSummary(devs, amrmBranches){
     devs.forEach(d=>{ perDev[d]=(DATA.sales_by_emp[empId]||{})[d]||0; });
     const devSold=devs.reduce((s,d)=>s+perDev[d],0);
     const agreed=DATA.by_emp[empId]?.agreed||0;
+    const evaluated=DATA.by_emp[empId]?.evaluated||0;
     const attP=pct(agreed,devSold);
-    return{empId,name,branch,perDev,devSold,agreed,attP};
+    return{empId,name,branch,perDev,devSold,evaluated,agreed,attP};
   }).filter(Boolean).sort((a,b)=>b.attP-a.attP||b.agreed-a.agreed||b.devSold-a.devSold);
 
   if(EMP_LIST_CACHE.length===0){
@@ -1076,6 +1077,7 @@ function renderEmpPage(page){
       </td>
       ${devCells}
       <td class="px-1 py-2 text-center text-sm font-bold text-[#9E7A3F]">${e.devSold||'–'}</td>
+      <td class="px-1 py-2 text-center text-sm font-semibold text-gray-500">${e.evaluated||'–'}</td>
       <td class="px-1 py-2 text-center text-base font-black text-emerald-600">${e.agreed}</td>
       <td class="px-1 py-2 min-w-[90px]">
         <div class="flex items-center gap-1">
@@ -1114,6 +1116,7 @@ function renderEmpPage(page){
           <th class="px-2 py-2.5 text-left text-xs font-bold hidden md:table-cell">สาขา</th>
           ${devHeads}
           <th class="px-1 py-2.5 text-center text-xs font-bold w-10">รวม<br><span class="font-normal text-white/60 text-[9px]">ขาย</span></th>
+          <th class="px-1 py-2.5 text-center text-xs font-bold w-12">ประเมิน<br><span class="font-normal text-white/60 text-[9px]">เทรด</span></th>
           <th class="px-1 py-2.5 text-center text-xs font-bold w-12">ตกลง<br><span class="font-normal text-white/60 text-[9px]">เทรด</span></th>
           <th class="px-1 py-2.5 text-center text-xs font-bold w-[108px]">ATT%</th>
         </tr>
