@@ -749,14 +749,42 @@ function showDashboard(){
     amrmFilter.classList.add('hidden');
     amrmPlaceholder.classList.remove('hidden');
   }
-  updateBranchCheckboxes();
+  loadCookieFilters();       // คืนค่า BU/RM/AM + สาขาที่บันทึกไว้
+  updateBranchCheckboxes(); // refresh branch list ตาม AM ที่โหลดมา
   updateChips(); render();
 }
+// ===== COOKIE FILTER PERSISTENCE =====
+const FILTER_COOKIE='s7_filter';
+function saveCookieFilters(){
+  const bu=document.getElementById('filter-bu')?.value||'';
+  const rm=document.getElementById('filter-rm')?.value||'';
+  const am=document.getElementById('filter-am')?.value||'';
+  const branches=[...SELECTED_BRANCHES];
+  const val=encodeURIComponent(JSON.stringify({bu,rm,am,branches}));
+  const exp=new Date(Date.now()+30*24*3600*1000).toUTCString();
+  document.cookie=`${FILTER_COOKIE}=${val}; expires=${exp}; path=/`;
+}
+function loadCookieFilters(){
+  try{
+    const match=document.cookie.split('; ').find(c=>c.startsWith(FILTER_COOKIE+'='));
+    if(!match)return;
+    const saved=JSON.parse(decodeURIComponent(match.split('=').slice(1).join('=')));
+    ['bu','rm','am'].forEach(k=>{
+      const el=document.getElementById('filter-'+k);
+      if(el&&saved[k])el.value=saved[k];
+    });
+    SELECTED_BRANCHES.clear();
+    if(Array.isArray(saved.branches)&&saved.branches.length>0)
+      saved.branches.forEach(b=>SELECTED_BRANCHES.add(b));
+  }catch(e){}
+}
+
 function onAMRMChange(){
   // เมื่อ BU/RM/AM เปลี่ยน → reset branch selection แล้ว update list
   SELECTED_BRANCHES.clear();
   updateBranchCheckboxes();
   render();
+  saveCookieFilters();
 }
 // กรองสาขาตาม BU/RM/AM + SELECTED_BRANCHES checkbox
 function getAMRMBranches(){
@@ -797,6 +825,7 @@ function resetAMRM(){
   SELECTED_BRANCHES.clear();
   updateBranchCheckboxes();
   render();
+  saveCookieFilters();
 }
 
 function resetDashboard(){
@@ -871,6 +900,7 @@ function toggleAllBranches(masterCb){
   }
   updateBranchFilterLabel();
   render();
+  saveCookieFilters();
 }
 
 function onBranchCheckChange(){
@@ -887,6 +917,7 @@ function onBranchCheckChange(){
   if(allCb) allCb.checked=(checked.length===all.length);
   updateBranchFilterLabel();
   render();
+  saveCookieFilters();
 }
 
 function updateBranchFilterLabel(){
