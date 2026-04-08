@@ -377,7 +377,10 @@ function mark(id, text, textCls, bgCls){
 function readXlsx(file){
   return new Promise((res,rej)=>{
     const r=new FileReader();
-    r.onload=e=>{ const wb=XLSX.read(e.target.result,{type:'array'}); res(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:null})); };
+    r.onload=e=>{
+      const wb=XLSX.read(e.target.result,{type:'array',cellStyles:false,cellFormulas:false,cellHTML:false,cellText:false,dense:true});
+      res(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:null}));
+    };
     r.onerror=rej; r.readAsArrayBuffer(file);
   });
 }
@@ -568,62 +571,54 @@ async function processFiles(){
     // คอลัม Q (index 16) ในไฟล์ยอดขาย = เลขที่บิล สำหรับ lookup ข้ามไฟล์เทรด
     const sBillCol=Object.keys(sS)[16]??null;
 
-    // Detect which months are present in the sales file
-    const activeMths=new Set();
+    // === PASS 1: empNameMap + salesBranchIdMap + activeMths + activeDates (single loop) ===
+    const empNameMap={}, salesBranchIdMap={}, activeMths=new Set(), activeDates=new Set();
     sRows.forEach(r=>{
+      // วันที่ → เดือน + วันที่ CE สำหรับ filter
       const raw=s(r[kDate]);
-      const m=raw.match(/(\d{2})\/(\d{2})\/\d{4}/);
-      if(m){ const mn=parseInt(m[2]); if(mn>=1&&mn<=12)activeMths.add(mn); }
-    });
-
-    // Build empNameMap: Officer(ID) → Officer(Name)  (AQ → AR)
-    const empNameMap={};
-    sRows.forEach(r=>{
-      const oid=s(r[kOff]); if(!oid)return;
-      const nm=s(r[kOffName]); if(nm&&!empNameMap[oid]) empNameMap[oid]=nm;
-    });
-
-    // สร้าง salesBranchIdMap: {branchId → shortBranchName} ใช้จับคู่ข้ามไฟล์ด้วย Branch ID
-    // แก้ปัญหาชื่อสาขาสะกดต่างกัน เช่น Lamlukka vs LumLukka
-    const salesBranchIdMap={};
-    sRows.forEach(r=>{
-      if(r[kPType]!=='Inventory Item')return;
-      const bid=String(Number(s(r[kBranchId]))||0); if(bid==='0')return;
-      const bname=shortBranch(s(r[kBranch])); if(!bname||bname==='Unknown')return;
-      if(!salesBranchIdMap[bid])salesBranchIdMap[bid]=bname;
-    });
-
-    // Build billToEmp: {billNo → {empId, name, branch}} จากคอลัม Q (sBillCol) ของ sales
-    // ใช้ lookup ข้ามไฟล์เทรดเมื่อพนักงานกรอกรหัสผิด
-    const billToEmp={};
-    if(sBillCol){
-      sRows.forEach(r=>{
-        if(r[kPType]!=='Inventory Item')return;
-        const bill=s(r[sBillCol]); if(!bill)return;
-        const oid=s(r[kOff]); if(!oid)return;
-        if(billToEmp[bill])return; // first row wins
-        const nm=empNameMap[oid]||s(r[kOffName]||'');
+      if(raw){
+        const m=raw.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+        if(m){
+          const mn=parseInt(m[2]); if(mn>=1&&mn<=12)activeMths.add(mn);
+          const ceY=parseInt(m[3])>2100?parseInt(m[3])-543:parseInt(m[3]);
+          activeDates.add(`${m[1]}/${m[2]}/${ceY}`);
+        }
+      }
+      // empNameMap
+      const oid=s(r[kOff]);
+      if(oid){ const nm=s(r[kOffName]); if(nm&&!empNameMap[oid])empNameMap[oid]=nm; }
+      // salesBranchIdMap (เฉพาะ Inventory Item)
+      if(r[kPType]==='Inventory Item'){
         const bid=String(Number(s(r[kBranchId]))||0);
-        const branch=(bid&&bid!=='0'&&salesBranchIdMap[bid])?salesBranchIdMap[bid]:shortBranch(s(r[kBranch]));
-        billToEmp[bill]={empId:oid,name:nm,branch};
-      });
-    }
+        if(bid&&bid!=='0'&&!salesBranchIdMap[bid]){
+          const bn=shortBranch(s(r[kBranch]));
+          if(bn&&bn!=='Unknown')salesBranchIdMap[bid]=bn;
+        }
+      }
+    });
 
-    const salesByBranch={}, salesByEmp={}, salesEmpBranch={};
+    // === PASS 2: salesByBranch + salesByEmp + salesEmpBranch + billToEmp (single loop) ===
+    const salesByBranch={}, salesByEmp={}, salesEmpBranch={}, billToEmp={};
     sRows.forEach(r=>{
       if(r[kPType]!=='Inventory Item')return;
+      const bid=String(Number(s(r[kBranchId]))||0);
+      const branch=(bid&&bid!=='0'&&salesBranchIdMap[bid])?salesBranchIdMap[bid]:shortBranch(s(r[kBranch]));
+      const oid=s(r[kOff]);
+      // billToEmp lookup
+      if(sBillCol&&oid){
+        const bill=s(r[sBillCol]);
+        if(bill&&!billToEmp[bill])
+          billToEmp[bill]={empId:oid,name:empNameMap[oid]||s(r[kOffName]||''),branch};
+      }
+      // ยอดขาย device
       const qty=Number(r[kQty])||0; if(qty<=0)return;
-      const branch=shortBranch(s(r[kBranch])); const dev=CAT_DEV[s(r[kCat])]; if(!dev)return;
+      const dev=CAT_DEV[s(r[kCat])]; if(!dev)return;
       if(!salesByBranch[branch])salesByBranch[branch]={};
       salesByBranch[branch][dev]=(salesByBranch[branch][dev]||0)+qty;
-      const oid=s(r[kOff]); if(!oid)return;
+      if(!oid)return;
       if(!salesByEmp[oid])salesByEmp[oid]={};
       salesByEmp[oid][dev]=(salesByEmp[oid][dev]||0)+qty;
-      // บันทึกสาขาของพนักงาน (ใช้ salesBranchIdMap ถ้า Branch ID มีให้)
-      if(!salesEmpBranch[oid]){
-        const bid=String(Number(s(r[kBranchId]))||0);
-        salesEmpBranch[oid]=(bid&&bid!=='0'&&salesBranchIdMap[bid])?salesBranchIdMap[bid]:branch;
-      }
+      if(!salesEmpBranch[oid])salesEmpBranch[oid]=(bid&&bid!=='0'&&salesBranchIdMap[bid])?salesBranchIdMap[bid]:branch;
     });
 
     const THAI_MTH=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
@@ -635,17 +630,7 @@ async function processFiles(){
     const tBillCol=tKeys.length>253?tKeys[253]:null;
 
     if(tradeFormat==='search'){
-      // แปลงวันที่จากไฟล์ยอดขาย: BE → CE (DD/MM/YYYY CE)
-      const activeDates=new Set();
-      sRows.forEach(r=>{
-        const raw=s(r[kDate]);
-        const m=raw.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-        if(m){
-          const ceYear=parseInt(m[3])>2100?parseInt(m[3])-543:parseInt(m[3]);
-          activeDates.add(`${m[1]}/${m[2]}/${ceYear}`);
-        }
-      });
-
+      // activeDates สร้างแล้วใน PASS 1 — ใช้ได้เลย
       // กรองตามวันที่ขาย Device; ถ้าไม่มี overlap ให้ fallback แสดงข้อมูลทั้งหมด
       let result=parseTradeSearch(tRows,activeDates,salesKeys,empNameMap,salesBranchIdMap,billToEmp,tBillCol);
       const totalFiltered=Object.values(result.summary).reduce((s,v)=>s+v.evaluated,0);
