@@ -985,37 +985,51 @@ function renderSummary(sorted, devs){
   }).join('');
 }
 
-// ===== EMPLOYEE PERFORMANCE TABLE =====
+// ===== EMPLOYEE PERFORMANCE TABLE (paginated 20/page) =====
+const EMP_PAGE_SIZE=20;
+let EMP_LIST_CACHE=[], EMP_PAGE_DEVS=[], EMP_CUR_PAGE=0;
+
 function renderEmpSummary(devs, amrmBranches){
   const wrap=document.getElementById('emp-table-wrap');
   if(!wrap||!DATA)return;
 
-  // รวม empIds จาก sales_by_emp (ทุกคนที่ขาย Device อย่างน้อย 1 ชิ้น)
-  const empList=Object.keys(DATA.sales_by_emp).map(empId=>{
-    // branch: ใช้จาก by_emp (trade) หรือ emp_branch (sales) หรือ Unknown
+  EMP_PAGE_DEVS=devs;
+  EMP_CUR_PAGE=0;
+  EMP_LIST_CACHE=Object.keys(DATA.sales_by_emp).map(empId=>{
     const branch=DATA.by_emp[empId]?.branch||DATA.emp_branch[empId]||'Unknown';
-    // กรองตาม filter BU/RM/AM/Branch
     if(amrmBranches&&!amrmBranches.has(branch))return null;
     const name=DATA.by_emp[empId]?.name||DATA.emp_names[empId]||empId;
     const perDev={};
     devs.forEach(d=>{ perDev[d]=(DATA.sales_by_emp[empId]||{})[d]||0; });
     const devSold=devs.reduce((s,d)=>s+perDev[d],0);
     const agreed=DATA.by_emp[empId]?.agreed||0;
-    const evaluated=DATA.by_emp[empId]?.evaluated||0;
     const attP=pct(agreed,devSold);
-    return{empId,name,branch,perDev,devSold,agreed,evaluated,attP};
+    return{empId,name,branch,perDev,devSold,agreed,attP};
   }).filter(Boolean).sort((a,b)=>b.attP-a.attP||b.agreed-a.agreed||b.devSold-a.devSold);
 
-  if(empList.length===0){
+  if(EMP_LIST_CACHE.length===0){
     wrap.innerHTML='<div class="py-14 text-center text-gray-400 text-sm">ไม่มีข้อมูลพนักงานในช่วงที่เลือก</div>';
     return;
   }
+  renderEmpPage(0);
+}
+
+function renderEmpPage(page){
+  const wrap=document.getElementById('emp-table-wrap');
+  if(!wrap)return;
+  const devs=EMP_PAGE_DEVS;
+  const total=EMP_LIST_CACHE.length;
+  const totalPages=Math.ceil(total/EMP_PAGE_SIZE);
+  EMP_CUR_PAGE=Math.max(0,Math.min(page,totalPages-1));
+  const start=EMP_CUR_PAGE*EMP_PAGE_SIZE;
+  const pageItems=EMP_LIST_CACHE.slice(start,start+EMP_PAGE_SIZE);
 
   const devHeads=devs.map(d=>`<th class="px-1 py-2.5 text-center text-xs font-bold w-10 whitespace-nowrap">${DEV_ICONS[d]}<br><span class="font-normal text-white/60 text-[9px]">${DEV_LABELS[d]}</span></th>`).join('');
 
-  const rows=empList.map((e,i)=>{
+  const rows=pageItems.map((e,pi)=>{
+    const i=start+pi; // global rank index
     const danger=e.attP<15&&e.devSold>0;
-    const rowBg=danger?'bg-red-50 hover:bg-red-100':(i%2===0?'bg-white hover:bg-gray-50':'bg-gray-50/60 hover:bg-gray-100');
+    const rowBg=danger?'bg-red-50 hover:bg-red-100':(pi%2===0?'bg-white hover:bg-gray-50':'bg-gray-50/60 hover:bg-gray-100');
     const attColor=danger?'text-red-600 font-black':(e.attP>=60?'text-emerald-600 font-black':'text-amber-600 font-black');
     const barColor=danger?'bg-red-400':(e.attP>=60?'bg-emerald-500':e.attP>=40?'bg-amber-400':'bg-orange-400');
     const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
@@ -1048,20 +1062,46 @@ function renderEmpSummary(devs, amrmBranches){
     </tr>`;
   }).join('');
 
-  wrap.innerHTML=`<table class="w-full table-auto">
-    <thead>
-      <tr class="bg-[#1F3B2D] text-white">
-        <th class="px-1 py-2.5 text-center text-xs font-bold uppercase tracking-wide w-7">#</th>
-        <th class="px-2 py-2.5 text-left text-sm font-bold">ชื่อพนักงาน</th>
-        <th class="px-2 py-2.5 text-left text-xs font-bold hidden md:table-cell">สาขา</th>
-        ${devHeads}
-        <th class="px-1 py-2.5 text-center text-xs font-bold w-10">รวม<br><span class="font-normal text-white/60 text-[9px]">ขาย</span></th>
-        <th class="px-1 py-2.5 text-center text-xs font-bold w-12">ตกลง<br><span class="font-normal text-white/60 text-[9px]">เทรด</span></th>
-        <th class="px-1 py-2.5 text-center text-xs font-bold w-[108px]">ATT%</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>`;
+  const cur=EMP_CUR_PAGE, hasPrev=cur>0, hasNext=cur<totalPages-1;
+  const pageBtnClass='px-3 py-1.5 rounded-lg text-xs font-bold transition-all';
+  const activeBtn=`${pageBtnClass} bg-[#1F3B2D] text-white`;
+  const disabledBtn=`${pageBtnClass} bg-gray-100 text-gray-300 cursor-not-allowed`;
+  const enabledBtn=`${pageBtnClass} bg-white border border-gray-200 text-gray-600 hover:bg-gray-50`;
+
+  // Page number buttons (show up to 7 around current page)
+  const pageNums=[];
+  for(let p=0;p<totalPages;p++){
+    if(p===0||p===totalPages-1||Math.abs(p-cur)<=2) pageNums.push(p);
+    else if(pageNums[pageNums.length-1]!=='...') pageNums.push('...');
+  }
+  const pageNumBtns=pageNums.map(p=>p==='...'
+    ?`<span class="px-1 text-gray-400 text-xs">…</span>`
+    :`<button onclick="renderEmpPage(${p})" class="${p===cur?activeBtn:enabledBtn}">${p+1}</button>`
+  ).join('');
+
+  wrap.innerHTML=`
+    <table class="w-full table-auto">
+      <thead>
+        <tr class="bg-[#1F3B2D] text-white">
+          <th class="px-1 py-2.5 text-center text-xs font-bold uppercase tracking-wide w-7">#</th>
+          <th class="px-2 py-2.5 text-left text-sm font-bold">ชื่อพนักงาน</th>
+          <th class="px-2 py-2.5 text-left text-xs font-bold hidden md:table-cell">สาขา</th>
+          ${devHeads}
+          <th class="px-1 py-2.5 text-center text-xs font-bold w-10">รวม<br><span class="font-normal text-white/60 text-[9px]">ขาย</span></th>
+          <th class="px-1 py-2.5 text-center text-xs font-bold w-12">ตกลง<br><span class="font-normal text-white/60 text-[9px]">เทรด</span></th>
+          <th class="px-1 py-2.5 text-center text-xs font-bold w-[108px]">ATT%</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50/50">
+      <span class="text-xs text-gray-400">${start+1}–${Math.min(start+EMP_PAGE_SIZE,total)} จาก ${total} คน</span>
+      <div class="flex items-center gap-1">
+        <button onclick="renderEmpPage(${cur-1})" ${hasPrev?'':' disabled'} class="${hasPrev?enabledBtn:disabledBtn}">◄ ก่อน</button>
+        ${pageNumBtns}
+        <button onclick="renderEmpPage(${cur+1})" ${hasNext?'':' disabled'} class="${hasNext?enabledBtn:disabledBtn}">ถัดไป ►</button>
+      </div>
+    </div>`;
 }
 
 // ===== HELPERS =====
