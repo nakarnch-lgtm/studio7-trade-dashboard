@@ -452,14 +452,18 @@ function parseASMFile(rows, salesKeys, salesBranchIdMap={}){
   const map={};
   rows.forEach(r=>{
     const raw=s(r['Name']||r['BRANCH_NAME']||r['Branch']||'');
-    if(!raw)return;
     const asmId=String(Number(s(r['ID']||''))||0);
     let matched;
+    // ลำดับที่ 1: จับคู่ด้วย ID → ได้ชื่อ canonical จาก sales file (ถูกต้องที่สุด)
     if(asmId&&asmId!=='0'&&salesBranchIdMap[asmId]){
-      matched=salesBranchIdMap[asmId]; // ID-based match (ใช้ชื่อจาก sales file เป็น canonical)
-    } else {
+      matched=salesBranchIdMap[asmId];
+    // ลำดับที่ 2: มีชื่อสาขา → match กับ salesKeys
+    } else if(raw){
       const short=shortBranch(raw);
       matched=matchBranch(short, salesKeys)||short;
+    // ลำดับที่ 3: ไม่มีทั้งชื่อและ ID match → ข้ามแถวนี้
+    } else {
+      return;
     }
     map[matched]={
       am: s(r['AM']||'').trim(),
@@ -587,13 +591,12 @@ async function processFiles(){
       // empNameMap
       const oid=s(r[kOff]);
       if(oid){ const nm=s(r[kOffName]); if(nm&&!empNameMap[oid])empNameMap[oid]=nm; }
-      // salesBranchIdMap (เฉพาะ Inventory Item)
-      if(r[kPType]==='Inventory Item'){
-        const bid=String(Number(s(r[kBranchId]))||0);
-        if(bid&&bid!=='0'&&!salesBranchIdMap[bid]){
-          const bn=shortBranch(s(r[kBranch]));
-          if(bn&&bn!=='Unknown')salesBranchIdMap[bid]=bn;
-        }
+      // salesBranchIdMap จากทุก row — ให้สาขาที่ไม่มี Device sales ยังถูก map ได้
+      // (Inventory Item ใส่ก่อน เพราะมีชื่อสาขาที่ canonical กว่า)
+      const _bid=String(Number(s(r[kBranchId]))||0);
+      if(_bid&&_bid!=='0'&&!salesBranchIdMap[_bid]){
+        const _bn=shortBranch(s(r[kBranch]));
+        if(_bn&&_bn!=='Unknown')salesBranchIdMap[_bid]=_bn;
       }
     });
 
