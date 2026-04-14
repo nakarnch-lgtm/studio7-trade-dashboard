@@ -724,27 +724,6 @@ async function processFiles(){
       branch_amrm:branchAMRM,
       has_amrm:hasAMRM
     };
-    // ======= VISIBLE DEBUG PANEL (ลบออกหลังแก้ bug) =======
-    (function(){
-      const k2919=salesBranchIdMap['2919'];
-      const amrm2919=k2919?branchAMRM[k2919]:undefined;
-      const sales2919=k2919?salesByBranch[k2919]:undefined;
-      const thanadechBranches=Object.entries(branchAMRM).filter(([,v])=>v.am==='ธนเดช').map(([k])=>k);
-      const trade2919=k2919?tradeSummary[k2919]:undefined;
-      const info=[
-        '📌 salesBranchIdMap["2919"]: '+(k2919||'❌ NOT FOUND'),
-        '📌 branchAMRM[key]: '+(amrm2919?JSON.stringify(amrm2919):'❌ NOT FOUND'),
-        '📌 salesByBranch[key]: '+(sales2919?JSON.stringify(sales2919):'❌ NOT FOUND'),
-        '📌 tradeSummary[key]: '+(trade2919?JSON.stringify(trade2919):'❌ NOT FOUND'),
-        '📌 branchAMRM ธนเดช ('+thanadechBranches.length+' สาขา): '+thanadechBranches.join(', '),
-        '📌 salesByBranch keys ('+Object.keys(salesByBranch).length+'): '+Object.keys(salesByBranch).join(', '),
-      ];
-      let dbg=document.getElementById('_dbg_panel');
-      if(!dbg){dbg=document.createElement('div');dbg.id='_dbg_panel';document.body.prepend(dbg);}
-      dbg.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:#fff3cd;border-bottom:3px solid #e0a800;padding:12px;font-size:11px;font-family:monospace;white-space:pre-wrap;max-height:240px;overflow-y:auto;';
-      dbg.innerHTML='<b style="font-size:13px">🔍 DEBUG (ลบออกหลังแก้)</b> <button onclick="this.parentElement.remove()" style="float:right;cursor:pointer">✕ ปิด</button>\n'+info.join('\n');
-    })();
-    // ======= END DEBUG PANEL =======
     showDashboard();
   }catch(err){
     document.getElementById('loading').classList.add('hidden');
