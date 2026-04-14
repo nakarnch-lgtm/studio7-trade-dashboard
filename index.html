@@ -676,6 +676,23 @@ async function processFiles(){
       } else { DATA_MONTHS=''; }
     }
 
+    // === PASS 2.5: Augment salesBranchIdMap จากไฟล์ trade (column branch_code + ชื่อสาขา) ===
+    // ใช้เป็น backup กรณี sales file ไม่มี Branch (ID) หรือ mapping พลาด
+    // ตัด leading zeros ด้วย parseInt (เช่น '02919' → 2919)
+    if(tradeFormat==='search'){
+      tRows.forEach(r=>{
+        const rawCode=s(r['branch_code']||'');
+        const branchId=rawCode?String(parseInt(rawCode,10)||0):'';
+        if(!branchId||branchId==='0'||salesBranchIdMap[branchId])return; // มีแล้วไม่ overwrite
+        const rawName=s(r['ชื่อสาขา']||r['BRANCH_NAME']||'');
+        if(!rawName)return;
+        const bn=shortBranch(rawName);
+        // ถ้า bn ไม่อยู่ใน salesKeys ให้ fuzzy match ก่อน
+        const canonical=salesKeys.includes(bn)?bn:(matchBranch(bn,salesKeys)||bn);
+        if(canonical&&canonical!=='Unknown')salesBranchIdMap[branchId]=canonical;
+      });
+    }
+
     // Parse ASM mapping file if provided (optional ไฟล์ 3)
     let branchAMRM={}, hasAMRM=false;
     if(fileASM){
@@ -702,10 +719,12 @@ async function processFiles(){
       const amrm2919=k2919?branchAMRM[k2919]:undefined;
       const sales2919=k2919?salesByBranch[k2919]:undefined;
       const thanadechBranches=Object.entries(branchAMRM).filter(([,v])=>v.am==='ธนเดช').map(([k])=>k);
+      const trade2919=k2919?tradeSummary[k2919]:undefined;
       const info=[
         '📌 salesBranchIdMap["2919"]: '+(k2919||'❌ NOT FOUND'),
         '📌 branchAMRM[key]: '+(amrm2919?JSON.stringify(amrm2919):'❌ NOT FOUND'),
         '📌 salesByBranch[key]: '+(sales2919?JSON.stringify(sales2919):'❌ NOT FOUND'),
+        '📌 tradeSummary[key]: '+(trade2919?JSON.stringify(trade2919):'❌ NOT FOUND'),
         '📌 branchAMRM ธนเดช ('+thanadechBranches.length+' สาขา): '+thanadechBranches.join(', '),
         '📌 salesByBranch keys ('+Object.keys(salesByBranch).length+'): '+Object.keys(salesByBranch).join(', '),
       ];
