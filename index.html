@@ -777,8 +777,23 @@ function loadCookieFilters(){
       if(el&&saved[k])el.value=saved[k];
     });
     SELECTED_BRANCHES.clear();
-    if(Array.isArray(saved.branches)&&saved.branches.length>0)
-      saved.branches.forEach(b=>SELECTED_BRANCHES.add(b));
+    const savedBranches=Array.isArray(saved.branches)?new Set(saved.branches):new Set();
+    if(savedBranches.size>0){
+      savedBranches.forEach(b=>SELECTED_BRANCHES.add(b));
+      // สาขาใหม่ที่ไม่อยู่ใน cookie เดิม (เพิ่งปรากฏเพราะ bug fix)
+      // → เพิ่มเข้า SELECTED_BRANCHES อัตโนมัติ (ไม่ตัดออก)
+      if(DATA&&DATA.has_amrm){
+        const bu=saved.bu||''; const rm=saved.rm||''; const am=saved.am||'';
+        if(bu||rm||am){
+          Object.entries(DATA.branch_amrm).forEach(([b,v])=>{
+            if(bu&&v.bu!==bu)return;
+            if(rm&&v.rm!==rm)return;
+            if(am&&v.am!==am)return;
+            if(!SELECTED_BRANCHES.has(b))SELECTED_BRANCHES.add(b);
+          });
+        }
+      }
+    }
   }catch(e){}
 }
 
