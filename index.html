@@ -448,7 +448,7 @@ function statusCode(st){
 }
 // Parse ASM file → branchAMRM map: {shortBranch → {am, rm, bu, id}}
 // salesBranchIdMap = {branchId(string) → branchName} — จับคู่ด้วย ID ก่อน ถ้าไม่มีจึง fallback ชื่อ
-function parseASMFile(rows, salesKeys, salesBranchIdMap={}){
+function parseASMFile(rows, salesKeys, salesBranchIdMap={}, salesFileIds=null){
   const map={};
   rows.forEach(r=>{
     const raw=s(r['Name']||r['BRANCH_NAME']||r['Branch']||'');
@@ -464,6 +464,14 @@ function parseASMFile(rows, salesKeys, salesBranchIdMap={}){
     // ลำดับที่ 3: ไม่มีทั้งชื่อและ ID match → ข้ามแถวนี้
     } else {
       return;
+    }
+    // ถ้า key ซ้ำ (2 สาขาชื่อเดียวกัน เช่น ID 2919 + 2920 → ชื่อเดียวกัน):
+    // เก็บตัวที่ ID อยู่ใน sales file จริง (salesFileIds) → มี priority สูงกว่า
+    if(map[matched]){
+      const existId=String(Number(map[matched].id)||0);
+      const prio=salesFileIds||new Set(Object.keys(salesBranchIdMap));
+      if(prio.has(existId)&&!prio.has(asmId))return; // ตัวเดิมอยู่ใน sales แต่ตัวใหม่ไม่อยู่ → ไม่ overwrite
+      if(prio.has(existId)&&prio.has(asmId))return;   // ทั้งคู่อยู่ใน sales → เก็บตัวแรก
     }
     map[matched]={
       am: s(r['AM']||'').trim(),
@@ -676,6 +684,9 @@ async function processFiles(){
       } else { DATA_MONTHS=''; }
     }
 
+    // IDs จาก sales file เท่านั้น (ใช้เป็น priority ใน parseASMFile เมื่อ key ซ้ำ)
+    const salesFileIds=new Set(Object.keys(salesBranchIdMap));
+
     // === PASS 2.5: Augment salesBranchIdMap จากไฟล์ trade (column branch_code + ชื่อสาขา) ===
     // ใช้เป็น backup กรณี sales file ไม่มี Branch (ID) หรือ mapping พลาด
     // ตัด leading zeros ด้วย parseInt (เช่น '02919' → 2919)
@@ -698,7 +709,7 @@ async function processFiles(){
     if(fileASM){
       document.getElementById('loading-msg').textContent='กำลังอ่านข้อมูล AM/RM…';
       const asmRows=await readXlsx(fileASM);
-      branchAMRM=parseASMFile(asmRows, salesKeys, salesBranchIdMap);
+      branchAMRM=parseASMFile(asmRows, salesKeys, salesBranchIdMap, salesFileIds);
       hasAMRM=Object.keys(branchAMRM).length>0;
     }
 
