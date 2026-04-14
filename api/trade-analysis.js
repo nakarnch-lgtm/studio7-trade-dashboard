@@ -25,8 +25,8 @@ function sanitizeBranch(b) {
 
 function validateData(data) {
   if (!data || typeof data !== "object") return null;
-  const top3Raw = Array.isArray(data.top3) ? data.top3.slice(0, 3) : [];
-  const lowRaw = Array.isArray(data.lowBranches) ? data.lowBranches.slice(0, 50) : [];
+  var top3Raw = Array.isArray(data.top3) ? data.top3.slice(0, 3) : [];
+  var lowRaw = Array.isArray(data.lowBranches) ? data.lowBranches.slice(0, 50) : [];
   return {
     filterContext: String(data.filterContext || "").slice(0, 200),
     overallATT: Math.max(0, Math.min(999, Number(data.overallATT) || 0)),
@@ -40,93 +40,57 @@ function validateData(data) {
   };
 }
 
-const SYSTEM_PROMPT = `คุณเป็น ASM (Area Sales Manager) ของ Studio7 ประเทศไทย ผู้เชี่ยวชาญด้านการวิเคราะห์ยอดขายและ Trade-In ของ Apple Products
-
-คุณต้องสร้างข้อความสรุปภาษาไทยที่ copy ไปวาง LINE ได้สวยทันที
-
-กฎสำคัญ:
-- ใช้ ** สำหรับข้อความที่ต้องการเน้น (LINE รองรับ bold ด้วย **)
-- ใช้ emoji หัวข้อ: 📊 สรุป, 🏆 Top 3, ⚠️ สาขาต่ำ, 🚀 Action
-- ใช้ 👉 สำหรับ insight หรือจุดเด่น
-- ใช้ * สำหรับ bullet points
-- ใช้ตัวเลขสำหรับลำดับ (1. 2. 3.)
-- กระชับ ตรงประเด็น อ่านง่าย
-- ห้ามใช้ markdown อื่นเช่น # หรือ --- หรือ \`\`\`
-- ต้องมี Section "Action ไล่ยอด" ที่มีคำแนะนำเชิงปฏิบัติจริงๆ รวมถึง Script ตัวอย่างสำหรับพนักงานขาย
-
-รูปแบบที่ต้องการ (ห้ามเปลี่ยนโครงสร้าง):
-
-📊 **สรุปสถานการณ์ Trade-in โซน [ชื่อโซน/AM] ([ช่วงเวลา])**
-
-ภาพรวมโซนตอนนี้
-
-* ATT อยู่ที่ **X%**
-* ตกลงเทรด **X / X รายการ (~X%)**
-  👉 [insight สั้นๆ เกี่ยวกับ conversion rate]
-
-🏆 **Top 3 สาขา**
-
-1. [ชื่อสาขา] – X%
-2. [ชื่อสาขา] – X%
-3. [ชื่อสาขา] – X%
-  👉 จุดเด่น: [วิเคราะห์สั้นๆ ว่าทำไมเก่ง]
-
-⚠️ **สาขาที่ต่ำกว่า 15% (ต้องเร่งด่วน)**
-
-* [ชื่อสาขา] – X%
-* [ชื่อสาขา] – X%
-[... ทุกสาขาที่ต่ำกว่า 15%]
-
-👉 Insight: [วิเคราะห์สาเหตุสั้นๆ]
-
-🚀 **Action ไล่ยอด (โฟกัสทันที)**
-
-1. [คำแนะนำเชิงปฏิบัติข้อ 1]
-2. ใช้ Script เดียวกันทั้งโซน
-   "[ตัวอย่าง script สำหรับเสนอ trade-in ให้ลูกค้า]"
-3. [คำแนะนำข้อ 3]
-4. [คำแนะนำข้อ 4]`;
+var SYSTEM_PROMPT = "\u0E04\u0E38\u0E13\u0E40\u0E1B\u0E47\u0E19 ASM (Area Sales Manager) \u0E02\u0E2D\u0E07 Studio7 \u0E1B\u0E23\u0E30\u0E40\u0E17\u0E28\u0E44\u0E17\u0E22 \u0E1C\u0E39\u0E49\u0E40\u0E0A\u0E35\u0E48\u0E22\u0E27\u0E0A\u0E32\u0E0D\u0E14\u0E49\u0E32\u0E19\u0E01\u0E32\u0E23\u0E27\u0E34\u0E40\u0E04\u0E23\u0E32\u0E30\u0E2B\u0E4C\u0E22\u0E2D\u0E14\u0E02\u0E32\u0E22\u0E41\u0E25\u0E30 Trade-In \u0E02\u0E2D\u0E07 Apple Products\n\n\u0E04\u0E38\u0E13\u0E15\u0E49\u0E2D\u0E07\u0E2A\u0E23\u0E49\u0E32\u0E07\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21\u0E2A\u0E23\u0E38\u0E1B\u0E20\u0E32\u0E29\u0E32\u0E44\u0E17\u0E22\u0E17\u0E35\u0E48 copy \u0E44\u0E1B\u0E27\u0E32\u0E07 LINE \u0E44\u0E14\u0E49\u0E2A\u0E27\u0E22\u0E17\u0E31\u0E19\u0E17\u0E35\n\n\u0E01\u0E0E\u0E2A\u0E33\u0E04\u0E31\u0E0D:\n- \u0E43\u0E0A\u0E49 ** \u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21\u0E17\u0E35\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E01\u0E32\u0E23\u0E40\u0E19\u0E49\u0E19 (LINE \u0E23\u0E2D\u0E07\u0E23\u0E31\u0E1A bold \u0E14\u0E49\u0E27\u0E22 **)\n- \u0E43\u0E0A\u0E49 emoji \u0E2B\u0E31\u0E27\u0E02\u0E49\u0E2D: \uD83D\uDCCA \u0E2A\u0E23\u0E38\u0E1B, \uD83C\uDFC6 Top 3, \u26A0\uFE0F \u0E2A\u0E32\u0E02\u0E32\u0E15\u0E48\u0E33, \uD83D\uDE80 Action\n- \u0E43\u0E0A\u0E49 \uD83D\uDC49 \u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A insight \u0E2B\u0E23\u0E37\u0E2D\u0E08\u0E38\u0E14\u0E40\u0E14\u0E48\u0E19\n- \u0E43\u0E0A\u0E49 * \u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A bullet points\n- \u0E43\u0E0A\u0E49\u0E15\u0E31\u0E27\u0E40\u0E25\u0E02\u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E25\u0E33\u0E14\u0E31\u0E1A (1. 2. 3.)\n- \u0E01\u0E23\u0E30\u0E0A\u0E31\u0E1A \u0E15\u0E23\u0E07\u0E1B\u0E23\u0E30\u0E40\u0E14\u0E47\u0E19 \u0E2D\u0E48\u0E32\u0E19\u0E07\u0E48\u0E32\u0E22\n- \u0E2B\u0E49\u0E32\u0E21\u0E43\u0E0A\u0E49 markdown \u0E2D\u0E37\u0E48\u0E19\u0E40\u0E0A\u0E48\u0E19 # \u0E2B\u0E23\u0E37\u0E2D --- \u0E2B\u0E23\u0E37\u0E2D ```\n- \u0E15\u0E49\u0E2D\u0E07\u0E21\u0E35 Section \"Action \u0E44\u0E25\u0E48\u0E22\u0E2D\u0E14\" \u0E17\u0E35\u0E48\u0E21\u0E35\u0E04\u0E33\u0E41\u0E19\u0E30\u0E19\u0E33\u0E40\u0E0A\u0E34\u0E07\u0E1B\u0E0F\u0E34\u0E1A\u0E31\u0E15\u0E34\u0E08\u0E23\u0E34\u0E07\u0E46 \u0E23\u0E27\u0E21\u0E16\u0E36\u0E07 Script \u0E15\u0E31\u0E27\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E1E\u0E19\u0E31\u0E01\u0E07\u0E32\u0E19\u0E02\u0E32\u0E22\n\n\u0E23\u0E39\u0E1B\u0E41\u0E1A\u0E1A\u0E17\u0E35\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E01\u0E32\u0E23 (\u0E2B\u0E49\u0E32\u0E21\u0E40\u0E1B\u0E25\u0E35\u0E48\u0E22\u0E19\u0E42\u0E04\u0E23\u0E07\u0E2A\u0E23\u0E49\u0E32\u0E07):\n\n\uD83D\uDCCA **\u0E2A\u0E23\u0E38\u0E1B\u0E2A\u0E16\u0E32\u0E19\u0E01\u0E32\u0E23\u0E13\u0E4C Trade-in \u0E42\u0E0B\u0E19 [\u0E0A\u0E37\u0E48\u0E2D\u0E42\u0E0B\u0E19/AM] ([\u0E0A\u0E48\u0E27\u0E07\u0E40\u0E27\u0E25\u0E32])**\n\n\u0E20\u0E32\u0E1E\u0E23\u0E27\u0E21\u0E42\u0E0B\u0E19\u0E15\u0E2D\u0E19\u0E19\u0E35\u0E49\n\n* ATT \u0E2D\u0E22\u0E39\u0E48\u0E17\u0E35\u0E48 **X%**\n* \u0E15\u0E01\u0E25\u0E07\u0E40\u0E17\u0E23\u0E14 **X / X \u0E23\u0E32\u0E22\u0E01\u0E32\u0E23 (~X%)**\n  \uD83D\uDC49 [insight \u0E2A\u0E31\u0E49\u0E19\u0E46 \u0E40\u0E01\u0E35\u0E48\u0E22\u0E27\u0E01\u0E31\u0E1A conversion rate]\n\n\uD83C\uDFC6 **Top 3 \u0E2A\u0E32\u0E02\u0E32**\n\n1. [\u0E0A\u0E37\u0E48\u0E2D\u0E2A\u0E32\u0E02\u0E32] \u2013 X%\n2. [\u0E0A\u0E37\u0E48\u0E2D\u0E2A\u0E32\u0E02\u0E32] \u2013 X%\n3. [\u0E0A\u0E37\u0E48\u0E2D\u0E2A\u0E32\u0E02\u0E32] \u2013 X%\n  \uD83D\uDC49 \u0E08\u0E38\u0E14\u0E40\u0E14\u0E48\u0E19: [\u0E27\u0E34\u0E40\u0E04\u0E23\u0E32\u0E30\u0E2B\u0E4C\u0E2A\u0E31\u0E49\u0E19\u0E46 \u0E27\u0E48\u0E32\u0E17\u0E33\u0E44\u0E21\u0E40\u0E01\u0E48\u0E07]\n\n\u26A0\uFE0F **\u0E2A\u0E32\u0E02\u0E32\u0E17\u0E35\u0E48\u0E15\u0E48\u0E33\u0E01\u0E27\u0E48\u0E32 15% (\u0E15\u0E49\u0E2D\u0E07\u0E40\u0E23\u0E48\u0E07\u0E14\u0E48\u0E27\u0E19)**\n\n* [\u0E0A\u0E37\u0E48\u0E2D\u0E2A\u0E32\u0E02\u0E32] \u2013 X%\n* [\u0E0A\u0E37\u0E48\u0E2D\u0E2A\u0E32\u0E02\u0E32] \u2013 X%\n[... \u0E17\u0E38\u0E01\u0E2A\u0E32\u0E02\u0E32\u0E17\u0E35\u0E48\u0E15\u0E48\u0E33\u0E01\u0E27\u0E48\u0E32 15%]\n\n\uD83D\uDC49 Insight: [\u0E27\u0E34\u0E40\u0E04\u0E23\u0E32\u0E30\u0E2B\u0E4C\u0E2A\u0E32\u0E40\u0E2B\u0E15\u0E38\u0E2A\u0E31\u0E49\u0E19\u0E46]\n\n\uD83D\uDE80 **Action \u0E44\u0E25\u0E48\u0E22\u0E2D\u0E14 (\u0E42\u0E1F\u0E01\u0E31\u0E2A\u0E17\u0E31\u0E19\u0E17\u0E35)**\n\n1. [\u0E04\u0E33\u0E41\u0E19\u0E30\u0E19\u0E33\u0E40\u0E0A\u0E34\u0E07\u0E1B\u0E0F\u0E34\u0E1A\u0E31\u0E15\u0E34\u0E02\u0E49\u0E2D 1]\n2. \u0E43\u0E0A\u0E49 Script \u0E40\u0E14\u0E35\u0E22\u0E27\u0E01\u0E31\u0E19\u0E17\u0E31\u0E49\u0E07\u0E42\u0E0B\u0E19\n   \"[\u0E15\u0E31\u0E27\u0E2D\u0E22\u0E48\u0E32\u0E07 script \u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E40\u0E2A\u0E19\u0E2D trade-in \u0E43\u0E2B\u0E49\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32]\"\n3. [\u0E04\u0E33\u0E41\u0E19\u0E30\u0E19\u0E33\u0E02\u0E49\u0E2D 3]\n4. [\u0E04\u0E33\u0E41\u0E19\u0E30\u0E19\u0E33\u0E02\u0E49\u0E2D 4]";
 
 function buildPrompt(data) {
-  const { filterContext, overallATT, totalSold, totalAgreed, totalEvaluated, branchCount, top3, lowBranches, period } = data;
-  const conversionRate = totalEvaluated > 0 ? Math.round((totalAgreed / totalEvaluated) * 100) : 0;
+  var filterContext = data.filterContext;
+  var overallATT = data.overallATT;
+  var totalSold = data.totalSold;
+  var totalAgreed = data.totalAgreed;
+  var totalEvaluated = data.totalEvaluated;
+  var branchCount = data.branchCount;
+  var top3 = data.top3;
+  var lowBranches = data.lowBranches;
+  var period = data.period;
+  var conversionRate = totalEvaluated > 0 ? Math.round((totalAgreed / totalEvaluated) * 100) : 0;
 
-  let prompt = `สร้างข้อความสรุป Trade-In ตาม template ที่กำหนดไว้ใน system prompt\n\n`;
-  prompt += `ข้อมูล:\n`;
-  if (period) prompt += `- ช่วงเวลา: ${period}\n`;
-  if (filterContext) prompt += `- ขอบเขต: ${filterContext}\n`;
-  prompt += `- จำนวนสาขา: ${branchCount}\n`;
-  prompt += `- ยอดขาย Device รวม: ${totalSold} ชิ้น\n`;
-  prompt += `- ยอดประเมินเทรด: ${totalEvaluated} รายการ\n`;
-  prompt += `- ตกลงเทรด: ${totalAgreed} รายการ\n`;
-  prompt += `- Conversion rate (ตกลง/ประเมิน): ~${conversionRate}%\n`;
-  prompt += `- ATT% รวม (ตกลง/ยอดขาย): ${overallATT}%\n\n`;
+  var prompt = "สร้างข้อความสรุป Trade-In ตาม template ที่กำหนดไว้ใน system prompt\n\n";
+  prompt += "ข้อมูล:\n";
+  if (period) prompt += "- ช่วงเวลา: " + period + "\n";
+  if (filterContext) prompt += "- ขอบเขต: " + filterContext + "\n";
+  prompt += "- จำนวนสาขา: " + branchCount + "\n";
+  prompt += "- ยอดขาย Device รวม: " + totalSold + " ชิ้น\n";
+  prompt += "- ยอดประเมินเทรด: " + totalEvaluated + " รายการ\n";
+  prompt += "- ตกลงเทรด: " + totalAgreed + " รายการ\n";
+  prompt += "- Conversion rate (ตกลง/ประเมิน): ~" + conversionRate + "%\n";
+  prompt += "- ATT% รวม (ตกลง/ยอดขาย): " + overallATT + "%\n\n";
 
   if (top3.length > 0) {
-    prompt += `Top 3 สาขา ATT% สูงสุด:\n`;
-    top3.forEach((b, i) => {
-      prompt += `${i + 1}. ${b.name} – ${b.att}% (ตกลง ${b.agreed}, ขาย ${b.sold})\n`;
+    prompt += "Top 3 สาขา ATT% สูงสุด:\n";
+    top3.forEach(function(b, i) {
+      prompt += (i + 1) + ". " + b.name + " – " + b.att + "% (ตกลง " + b.agreed + ", ขาย " + b.sold + ")\n";
     });
-    prompt += `\n`;
+    prompt += "\n";
   }
 
   if (lowBranches.length > 0) {
-    prompt += `สาขาที่ ATT% ต่ำกว่า 15%:\n`;
-    lowBranches.forEach((b) => {
-      prompt += `* ${b.name} – ${b.att}% (ตกลง ${b.agreed}, ขาย ${b.sold})\n`;
+    prompt += "สาขาที่ ATT% ต่ำกว่า 15%:\n";
+    lowBranches.forEach(function(b) {
+      prompt += "* " + b.name + " – " + b.att + "% (ตกลง " + b.agreed + ", ขาย " + b.sold + ")\n";
     });
-    prompt += `\n`;
+    prompt += "\n";
   }
 
-  prompt += `สร้างข้อความตาม template เป๊ะๆ รวมถึง section Action ไล่ยอด พร้อม Script ตัวอย่างที่พนักงานใช้เสนอ Trade-in กับลูกค้าได้จริง`;
+  prompt += "สร้างข้อความตาม template เป๊ะๆ รวมถึง section Action ไล่ยอด พร้อม Script ตัวอย่างที่พนักงานใช้เสนอ Trade-in กับลูกค้าได้จริง";
   return prompt;
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
   if (req.method === "OPTIONS") {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     return res.status(200).end();
   }
 
@@ -134,29 +98,29 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  var apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return res.status(500).json({ error: "OPENAI_API_KEY ไม่ได้ตั้งค่าใน Vercel Environment Variables" });
   }
 
-  const ip = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket?.remoteAddress || "unknown";
+  var ip = (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || "unknown";
   if (!checkRateLimit(ip)) {
     return res.status(429).json({ error: "กรุณารอสักครู่ก่อนลองใหม่ (จำกัด 10 ครั้ง/นาที)" });
   }
 
-  const validated = validateData(req.body?.data);
+  var validated = validateData(req.body && req.body.data);
   if (!validated) {
     return res.status(400).json({ error: "ข้อมูลไม่ถูกต้อง" });
   }
 
   try {
-    const prompt = buildPrompt(validated);
+    var prompt = buildPrompt(validated);
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    var response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+        "Authorization": "Bearer " + apiKey,
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
@@ -169,16 +133,16 @@ export default async function handler(req, res) {
     });
 
     if (!response.ok) {
-      const errBody = await response.text();
+      var errBody = await response.text();
       console.error("OpenAI API error:", response.status, errBody);
-      return res.status(500).json({ error: "ไม่สามารถวิเคราะห์ได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง" });
+      return res.status(500).json({ error: "OpenAI API error (status " + response.status + ")" });
     }
 
-    const data = await response.json();
-    const text = data.choices?.[0]?.message?.content || "ไม่สามารถวิเคราะห์ได้";
+    var data = await response.json();
+    var text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "ไม่สามารถวิเคราะห์ได้";
     return res.status(200).json({ analysis: text });
   } catch (err) {
-    console.error("Trade analysis error:", err.message);
-    return res.status(500).json({ error: "ไม่สามารถวิเคราะห์ได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง" });
+    console.error("Trade analysis error:", err.message || err);
+    return res.status(500).json({ error: "Server error: " + (err.message || "unknown") });
   }
-}
+};
