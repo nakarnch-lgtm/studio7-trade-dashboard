@@ -1408,10 +1408,7 @@ function render(){
 }
 
 function getAPIBaseURL(){
-  if(location.hostname.includes('.replit.dev')||location.hostname.includes('.repl.co')||location.hostname==='localhost'){
-    return '/api';
-  }
-  return null;
+  return '/api';
 }
 
 function collectAIData(){
@@ -1453,13 +1450,6 @@ let AI_IN_FLIGHT=false;
 async function runAIAnalysis(){
   if(AI_IN_FLIGHT)return;
   const base=getAPIBaseURL();
-  if(!base){
-    showAIModal();
-    document.getElementById('ai-loading').classList.add('hidden');
-    document.getElementById('ai-error').classList.remove('hidden');
-    document.getElementById('ai-error').textContent='ฟีเจอร์ AI วิเคราะห์ใช้งานได้เฉพาะบน Replit เท่านั้น (ไม่รองรับ Vercel deployment)';
-    return;
-  }
   const data=collectAIData();
   if(!data){alert('กรุณาอัปโหลดและประมวลผลข้อมูลก่อน');return;}
   AI_IN_FLIGHT=true;
