@@ -1209,10 +1209,16 @@ function render(){
   Object.values(DATA.sales_by_branch).forEach(sb=>{ DEV_KEYS.forEach(d=>{ devTotals[d]+=(sb[d]||0); }); });
   DEV_KEYS.forEach(d=>{ const el=document.getElementById('cnt-'+d); if(el)el.textContent=devTotals[d]; });
 
-  // ยึดรายชื่อสาขาตามไฟล์ยอดขาย — สาขาที่ไม่มียอดเทรดจะแสดง 0%
   const amrmBranches=getAMRMBranches(); // Set หรือ null
-  const allBranches=Object.keys(DATA.sales_by_branch).sort()
-    .filter(b=>!amrmBranches||amrmBranches.has(b));
+  // รวมสาขาจาก 3 แหล่ง: sales + trade + ASM territory (เมื่อกรอง BU/RM/AM)
+  const _pool=new Set([
+    ...Object.keys(DATA.sales_by_branch),
+    ...Object.keys(DATA.trade_summary).filter(b=>b!=='Unknown')
+  ]);
+  // กรอง AM → เพิ่มทุกสาขาใน territory แม้ยังไม่มีข้อมูล (แสดง 0)
+  if(amrmBranches&&!amrmBranches.has('__no_match__'))
+    amrmBranches.forEach(b=>_pool.add(b));
+  const allBranches=[..._pool].sort().filter(b=>!amrmBranches||amrmBranches.has(b));
   const hasUnknown=!!DATA.trade_summary['Unknown']&&(!amrmBranches||amrmBranches.has('Unknown'));
   let totalSales=0,totalAgreed=0,totalTrades=0;
   [...allBranches,...(hasUnknown?['Unknown']:[])].forEach(b=>{
