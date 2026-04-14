@@ -247,10 +247,14 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
                 <span id="branch-filter-label">สาขาทั้งหมด</span>
                 <svg class="w-3 h-3 text-gray-400 ml-auto shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
               </button>
-              <div id="branch-dropdown" class="hidden absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 w-64 flex flex-col" style="max-height:280px">
-                <div class="px-3 py-2 border-b border-gray-100 flex items-center gap-2 shrink-0">
-                  <input type="checkbox" id="branch-check-all" checked onchange="toggleAllBranches(this)">
-                  <label for="branch-check-all" class="text-xs font-bold text-gray-600 cursor-pointer select-none">เลือกทั้งหมด</label>
+              <div id="branch-dropdown" class="hidden absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 w-64 flex flex-col" style="max-height:340px">
+                <div class="px-3 py-2 border-b border-gray-100 shrink-0">
+                  <input type="text" id="branch-search" placeholder="🔍 ค้นหาสาขา..." oninput="filterBranchList(this.value)"
+                    class="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-gray-50 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1F3B2D] focus:bg-white mb-2">
+                  <div class="flex items-center gap-2">
+                    <input type="checkbox" id="branch-check-all" checked onchange="toggleAllBranches(this)">
+                    <label for="branch-check-all" class="text-xs font-bold text-gray-600 cursor-pointer select-none">เลือกทั้งหมด</label>
+                  </div>
                 </div>
                 <div id="branch-checkbox-list" class="overflow-y-auto py-1"></div>
               </div>
@@ -924,7 +928,13 @@ function switchView(v){
 // ===== BRANCH CHECKBOX DROPDOWN =====
 function toggleBranchDropdown(e){
   e.stopPropagation();
-  document.getElementById('branch-dropdown').classList.toggle('hidden');
+  const dd=document.getElementById('branch-dropdown');
+  dd.classList.toggle('hidden');
+  if(!dd.classList.contains('hidden')){
+    const si=document.getElementById('branch-search');
+    if(si){si.value='';filterBranchList('');}
+    setTimeout(()=>si?.focus(),50);
+  }
 }
 
 function updateBranchCheckboxes(){
@@ -984,6 +994,14 @@ function onBranchCheckChange(){
   updateBranchFilterLabel();
   render();
   saveCookieFilters();
+}
+
+function filterBranchList(query){
+  const q=query.trim().toLowerCase();
+  document.querySelectorAll('#branch-checkbox-list label').forEach(lbl=>{
+    const name=lbl.querySelector('span')?.textContent?.toLowerCase()||'';
+    lbl.style.display=(!q||name.includes(q))?'':'none';
+  });
 }
 
 function updateBranchFilterLabel(){
