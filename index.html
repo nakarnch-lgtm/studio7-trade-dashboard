@@ -696,6 +696,16 @@ async function processFiles(){
       branch_amrm:branchAMRM,
       has_amrm:hasAMRM
     };
+    // DEBUG: ตรวจสอบสาขา ID 2919
+    console.group('[DEBUG] Branch 2919 check');
+    console.log('salesBranchIdMap["2919"]:', salesBranchIdMap['2919']);
+    const _dbgKey = salesBranchIdMap['2919'];
+    console.log('branch_amrm[key]:', _dbgKey ? branchAMRM[_dbgKey] : 'key not found');
+    console.log('sales_by_branch[key]:', _dbgKey ? salesByBranch[_dbgKey] : 'key not found');
+    console.log('trade_summary[key]:', _dbgKey ? tradeSummary[_dbgKey] : 'key not found');
+    const _thanadech=Object.entries(branchAMRM).filter(([,v])=>v.am==='ธนเดช').map(([k])=>k);
+    console.log('branch_amrm ธนเดช count:', _thanadech.length, _thanadech);
+    console.groupEnd();
     showDashboard();
   }catch(err){
     document.getElementById('loading').classList.add('hidden');
