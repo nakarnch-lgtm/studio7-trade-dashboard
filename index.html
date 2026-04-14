@@ -1468,7 +1468,7 @@ async function runAIAnalysis(){
   showAIModal();
   try{
     const ctrl=new AbortController();
-    const timeout=setTimeout(()=>ctrl.abort(),30000);
+    const timeout=setTimeout(()=>ctrl.abort(),90000);
     const resp=await fetch(base+'/trade-analysis',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
