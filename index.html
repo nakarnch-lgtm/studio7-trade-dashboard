@@ -1449,7 +1449,9 @@ function collectAIData(){
   };
 }
 
+let AI_IN_FLIGHT=false;
 async function runAIAnalysis(){
+  if(AI_IN_FLIGHT)return;
   const base=getAPIBaseURL();
   if(!base){
     showAIModal();
@@ -1460,13 +1462,20 @@ async function runAIAnalysis(){
   }
   const data=collectAIData();
   if(!data){alert('กรุณาอัปโหลดและประมวลผลข้อมูลก่อน');return;}
+  AI_IN_FLIGHT=true;
+  const btn=document.getElementById('ai-analyze-btn');
+  if(btn){btn.disabled=true;btn.style.opacity='0.5';btn.style.pointerEvents='none';}
   showAIModal();
   try{
+    const ctrl=new AbortController();
+    const timeout=setTimeout(()=>ctrl.abort(),30000);
     const resp=await fetch(base+'/trade-analysis',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({data})
+      body:JSON.stringify({data}),
+      signal:ctrl.signal
     });
+    clearTimeout(timeout);
     const json=await resp.json();
     if(!resp.ok)throw new Error(json.error||'API error');
     document.getElementById('ai-loading').classList.add('hidden');
@@ -1476,7 +1485,10 @@ async function runAIAnalysis(){
   }catch(err){
     document.getElementById('ai-loading').classList.add('hidden');
     document.getElementById('ai-error').classList.remove('hidden');
-    document.getElementById('ai-error').textContent='เกิดข้อผิดพลาด: '+err.message;
+    document.getElementById('ai-error').textContent=err.name==='AbortError'?'หมดเวลาการเชื่อมต่อ กรุณาลองใหม่':'เกิดข้อผิดพลาด: '+err.message;
+  }finally{
+    AI_IN_FLIGHT=false;
+    if(btn){btn.disabled=false;btn.style.opacity='';btn.style.pointerEvents='';}
   }
 }
 
