@@ -1,10 +1,10 @@
-const RATE_LIMIT_WINDOW_MS = 60000;
-const RATE_LIMIT_MAX = 10;
-const ipHits = new Map();
+var RATE_LIMIT_WINDOW_MS = 60000;
+var RATE_LIMIT_MAX = 10;
+var ipHits = new Map();
 
 function checkRateLimit(ip) {
-  const now = Date.now();
-  const entry = ipHits.get(ip);
+  var now = Date.now();
+  var entry = ipHits.get(ip);
   if (!entry || now > entry.resetAt) {
     ipHits.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
     return true;
@@ -40,42 +40,33 @@ function validateData(data) {
   };
 }
 
-var SYSTEM_PROMPT = "\u0E04\u0E38\u0E13\u0E40\u0E1B\u0E47\u0E19 ASM (Area Sales Manager) \u0E02\u0E2D\u0E07 Studio7 \u0E1B\u0E23\u0E30\u0E40\u0E17\u0E28\u0E44\u0E17\u0E22 \u0E1C\u0E39\u0E49\u0E40\u0E0A\u0E35\u0E48\u0E22\u0E27\u0E0A\u0E32\u0E0D\u0E14\u0E49\u0E32\u0E19\u0E01\u0E32\u0E23\u0E27\u0E34\u0E40\u0E04\u0E23\u0E32\u0E30\u0E2B\u0E4C\u0E22\u0E2D\u0E14\u0E02\u0E32\u0E22\u0E41\u0E25\u0E30 Trade-In \u0E02\u0E2D\u0E07 Apple Products\n\n\u0E04\u0E38\u0E13\u0E15\u0E49\u0E2D\u0E07\u0E2A\u0E23\u0E49\u0E32\u0E07\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21\u0E2A\u0E23\u0E38\u0E1B\u0E20\u0E32\u0E29\u0E32\u0E44\u0E17\u0E22\u0E17\u0E35\u0E48 copy \u0E44\u0E1B\u0E27\u0E32\u0E07 LINE \u0E44\u0E14\u0E49\u0E2A\u0E27\u0E22\u0E17\u0E31\u0E19\u0E17\u0E35\n\n\u0E01\u0E0E\u0E2A\u0E33\u0E04\u0E31\u0E0D:\n- \u0E43\u0E0A\u0E49 ** \u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E02\u0E49\u0E2D\u0E04\u0E27\u0E32\u0E21\u0E17\u0E35\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E01\u0E32\u0E23\u0E40\u0E19\u0E49\u0E19 (LINE \u0E23\u0E2D\u0E07\u0E23\u0E31\u0E1A bold \u0E14\u0E49\u0E27\u0E22 **)\n- \u0E43\u0E0A\u0E49 emoji \u0E2B\u0E31\u0E27\u0E02\u0E49\u0E2D: \uD83D\uDCCA \u0E2A\u0E23\u0E38\u0E1B, \uD83C\uDFC6 Top 3, \u26A0\uFE0F \u0E2A\u0E32\u0E02\u0E32\u0E15\u0E48\u0E33, \uD83D\uDE80 Action\n- \u0E43\u0E0A\u0E49 \uD83D\uDC49 \u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A insight \u0E2B\u0E23\u0E37\u0E2D\u0E08\u0E38\u0E14\u0E40\u0E14\u0E48\u0E19\n- \u0E43\u0E0A\u0E49 * \u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A bullet points\n- \u0E43\u0E0A\u0E49\u0E15\u0E31\u0E27\u0E40\u0E25\u0E02\u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E25\u0E33\u0E14\u0E31\u0E1A (1. 2. 3.)\n- \u0E01\u0E23\u0E30\u0E0A\u0E31\u0E1A \u0E15\u0E23\u0E07\u0E1B\u0E23\u0E30\u0E40\u0E14\u0E47\u0E19 \u0E2D\u0E48\u0E32\u0E19\u0E07\u0E48\u0E32\u0E22\n- \u0E2B\u0E49\u0E32\u0E21\u0E43\u0E0A\u0E49 markdown \u0E2D\u0E37\u0E48\u0E19\u0E40\u0E0A\u0E48\u0E19 # \u0E2B\u0E23\u0E37\u0E2D --- \u0E2B\u0E23\u0E37\u0E2D ```\n- \u0E15\u0E49\u0E2D\u0E07\u0E21\u0E35 Section \"Action \u0E44\u0E25\u0E48\u0E22\u0E2D\u0E14\" \u0E17\u0E35\u0E48\u0E21\u0E35\u0E04\u0E33\u0E41\u0E19\u0E30\u0E19\u0E33\u0E40\u0E0A\u0E34\u0E07\u0E1B\u0E0F\u0E34\u0E1A\u0E31\u0E15\u0E34\u0E08\u0E23\u0E34\u0E07\u0E46 \u0E23\u0E27\u0E21\u0E16\u0E36\u0E07 Script \u0E15\u0E31\u0E27\u0E2D\u0E22\u0E48\u0E32\u0E07\u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E1E\u0E19\u0E31\u0E01\u0E07\u0E32\u0E19\u0E02\u0E32\u0E22\n\n\u0E23\u0E39\u0E1B\u0E41\u0E1A\u0E1A\u0E17\u0E35\u0E48\u0E15\u0E49\u0E2D\u0E07\u0E01\u0E32\u0E23 (\u0E2B\u0E49\u0E32\u0E21\u0E40\u0E1B\u0E25\u0E35\u0E48\u0E22\u0E19\u0E42\u0E04\u0E23\u0E07\u0E2A\u0E23\u0E49\u0E32\u0E07):\n\n\uD83D\uDCCA **\u0E2A\u0E23\u0E38\u0E1B\u0E2A\u0E16\u0E32\u0E19\u0E01\u0E32\u0E23\u0E13\u0E4C Trade-in \u0E42\u0E0B\u0E19 [\u0E0A\u0E37\u0E48\u0E2D\u0E42\u0E0B\u0E19/AM] ([\u0E0A\u0E48\u0E27\u0E07\u0E40\u0E27\u0E25\u0E32])**\n\n\u0E20\u0E32\u0E1E\u0E23\u0E27\u0E21\u0E42\u0E0B\u0E19\u0E15\u0E2D\u0E19\u0E19\u0E35\u0E49\n\n* ATT \u0E2D\u0E22\u0E39\u0E48\u0E17\u0E35\u0E48 **X%**\n* \u0E15\u0E01\u0E25\u0E07\u0E40\u0E17\u0E23\u0E14 **X / X \u0E23\u0E32\u0E22\u0E01\u0E32\u0E23 (~X%)**\n  \uD83D\uDC49 [insight \u0E2A\u0E31\u0E49\u0E19\u0E46 \u0E40\u0E01\u0E35\u0E48\u0E22\u0E27\u0E01\u0E31\u0E1A conversion rate]\n\n\uD83C\uDFC6 **Top 3 \u0E2A\u0E32\u0E02\u0E32**\n\n1. [\u0E0A\u0E37\u0E48\u0E2D\u0E2A\u0E32\u0E02\u0E32] \u2013 X%\n2. [\u0E0A\u0E37\u0E48\u0E2D\u0E2A\u0E32\u0E02\u0E32] \u2013 X%\n3. [\u0E0A\u0E37\u0E48\u0E2D\u0E2A\u0E32\u0E02\u0E32] \u2013 X%\n  \uD83D\uDC49 \u0E08\u0E38\u0E14\u0E40\u0E14\u0E48\u0E19: [\u0E27\u0E34\u0E40\u0E04\u0E23\u0E32\u0E30\u0E2B\u0E4C\u0E2A\u0E31\u0E49\u0E19\u0E46 \u0E27\u0E48\u0E32\u0E17\u0E33\u0E44\u0E21\u0E40\u0E01\u0E48\u0E07]\n\n\u26A0\uFE0F **\u0E2A\u0E32\u0E02\u0E32\u0E17\u0E35\u0E48\u0E15\u0E48\u0E33\u0E01\u0E27\u0E48\u0E32 15% (\u0E15\u0E49\u0E2D\u0E07\u0E40\u0E23\u0E48\u0E07\u0E14\u0E48\u0E27\u0E19)**\n\n* [\u0E0A\u0E37\u0E48\u0E2D\u0E2A\u0E32\u0E02\u0E32] \u2013 X%\n* [\u0E0A\u0E37\u0E48\u0E2D\u0E2A\u0E32\u0E02\u0E32] \u2013 X%\n[... \u0E17\u0E38\u0E01\u0E2A\u0E32\u0E02\u0E32\u0E17\u0E35\u0E48\u0E15\u0E48\u0E33\u0E01\u0E27\u0E48\u0E32 15%]\n\n\uD83D\uDC49 Insight: [\u0E27\u0E34\u0E40\u0E04\u0E23\u0E32\u0E30\u0E2B\u0E4C\u0E2A\u0E32\u0E40\u0E2B\u0E15\u0E38\u0E2A\u0E31\u0E49\u0E19\u0E46]\n\n\uD83D\uDE80 **Action \u0E44\u0E25\u0E48\u0E22\u0E2D\u0E14 (\u0E42\u0E1F\u0E01\u0E31\u0E2A\u0E17\u0E31\u0E19\u0E17\u0E35)**\n\n1. [\u0E04\u0E33\u0E41\u0E19\u0E30\u0E19\u0E33\u0E40\u0E0A\u0E34\u0E07\u0E1B\u0E0F\u0E34\u0E1A\u0E31\u0E15\u0E34\u0E02\u0E49\u0E2D 1]\n2. \u0E43\u0E0A\u0E49 Script \u0E40\u0E14\u0E35\u0E22\u0E27\u0E01\u0E31\u0E19\u0E17\u0E31\u0E49\u0E07\u0E42\u0E0B\u0E19\n   \"[\u0E15\u0E31\u0E27\u0E2D\u0E22\u0E48\u0E32\u0E07 script \u0E2A\u0E33\u0E2B\u0E23\u0E31\u0E1A\u0E40\u0E2A\u0E19\u0E2D trade-in \u0E43\u0E2B\u0E49\u0E25\u0E39\u0E01\u0E04\u0E49\u0E32]\"\n3. [\u0E04\u0E33\u0E41\u0E19\u0E30\u0E19\u0E33\u0E02\u0E49\u0E2D 3]\n4. [\u0E04\u0E33\u0E41\u0E19\u0E30\u0E19\u0E33\u0E02\u0E49\u0E2D 4]";
+var SYSTEM_PROMPT = "คุณเป็น ASM (Area Sales Manager) ของ Studio7 ประเทศไทย ผู้เชี่ยวชาญด้านการวิเคราะห์ยอดขายและ Trade-In ของ Apple Products\n\nคุณต้องสร้างข้อความสรุปภาษาไทยที่ copy ไปวาง LINE ได้สวยทันที\n\nกฎสำคัญ:\n- ใช้ ** สำหรับข้อความที่ต้องการเน้น (LINE รองรับ bold ด้วย **)\n- ใช้ emoji หัวข้อ: 📊 สรุป, 🏆 Top 3, ⚠️ สาขาต่ำ, 🚀 Action\n- ใช้ 👉 สำหรับ insight หรือจุดเด่น\n- ใช้ * สำหรับ bullet points\n- ใช้ตัวเลขสำหรับลำดับ (1. 2. 3.)\n- กระชับ ตรงประเด็น อ่านง่าย\n- ห้ามใช้ markdown อื่นเช่น # หรือ --- หรือ ```\n- ต้องมี Section \"Action ไล่ยอด\" ที่มีคำแนะนำเชิงปฏิบัติจริงๆ รวมถึง Script ตัวอย่างสำหรับพนักงานขาย\n\nรูปแบบที่ต้องการ (ห้ามเปลี่ยนโครงสร้าง):\n\n📊 **สรุปสถานการณ์ Trade-in โซน [ชื่อโซน/AM] ([ช่วงเวลา])**\n\nภาพรวมโซนตอนนี้\n\n* ATT อยู่ที่ **X%**\n* ตกลงเทรด **X / X รายการ (~X%)**\n  👉 [insight สั้นๆ เกี่ยวกับ conversion rate]\n\n🏆 **Top 3 สาขา**\n\n1. [ชื่อสาขา] – X%\n2. [ชื่อสาขา] – X%\n3. [ชื่อสาขา] – X%\n  👉 จุดเด่น: [วิเคราะห์สั้นๆ ว่าทำไมเก่ง]\n\n⚠️ **สาขาที่ต่ำกว่า 15% (ต้องเร่งด่วน)**\n\n* [ชื่อสาขา] – X%\n* [ชื่อสาขา] – X%\n[... ทุกสาขาที่ต่ำกว่า 15%]\n\n👉 Insight: [วิเคราะห์สาเหตุสั้นๆ]\n\n🚀 **Action ไล่ยอด (โฟกัสทันที)**\n\n1. [คำแนะนำเชิงปฏิบัติข้อ 1]\n2. ใช้ Script เดียวกันทั้งโซน\n   \"[ตัวอย่าง script สำหรับเสนอ trade-in ให้ลูกค้า]\"\n3. [คำแนะนำข้อ 3]\n4. [คำแนะนำข้อ 4]";
 
 function buildPrompt(data) {
-  var filterContext = data.filterContext;
-  var overallATT = data.overallATT;
-  var totalSold = data.totalSold;
-  var totalAgreed = data.totalAgreed;
-  var totalEvaluated = data.totalEvaluated;
-  var branchCount = data.branchCount;
-  var top3 = data.top3;
-  var lowBranches = data.lowBranches;
-  var period = data.period;
-  var conversionRate = totalEvaluated > 0 ? Math.round((totalAgreed / totalEvaluated) * 100) : 0;
+  var conversionRate = data.totalEvaluated > 0 ? Math.round((data.totalAgreed / data.totalEvaluated) * 100) : 0;
 
-  var prompt = "สร้างข้อความสรุป Trade-In ตาม template ที่กำหนดไว้ใน system prompt\n\n";
+  var prompt = "สร้างข้อความสรุป Trade-In ตาม template ที่กำหนดไว้ใน system instruction\n\n";
   prompt += "ข้อมูล:\n";
-  if (period) prompt += "- ช่วงเวลา: " + period + "\n";
-  if (filterContext) prompt += "- ขอบเขต: " + filterContext + "\n";
-  prompt += "- จำนวนสาขา: " + branchCount + "\n";
-  prompt += "- ยอดขาย Device รวม: " + totalSold + " ชิ้น\n";
-  prompt += "- ยอดประเมินเทรด: " + totalEvaluated + " รายการ\n";
-  prompt += "- ตกลงเทรด: " + totalAgreed + " รายการ\n";
+  if (data.period) prompt += "- ช่วงเวลา: " + data.period + "\n";
+  if (data.filterContext) prompt += "- ขอบเขต: " + data.filterContext + "\n";
+  prompt += "- จำนวนสาขา: " + data.branchCount + "\n";
+  prompt += "- ยอดขาย Device รวม: " + data.totalSold + " ชิ้น\n";
+  prompt += "- ยอดประเมินเทรด: " + data.totalEvaluated + " รายการ\n";
+  prompt += "- ตกลงเทรด: " + data.totalAgreed + " รายการ\n";
   prompt += "- Conversion rate (ตกลง/ประเมิน): ~" + conversionRate + "%\n";
-  prompt += "- ATT% รวม (ตกลง/ยอดขาย): " + overallATT + "%\n\n";
+  prompt += "- ATT% รวม (ตกลง/ยอดขาย): " + data.overallATT + "%\n\n";
 
-  if (top3.length > 0) {
+  if (data.top3.length > 0) {
     prompt += "Top 3 สาขา ATT% สูงสุด:\n";
-    top3.forEach(function(b, i) {
+    data.top3.forEach(function(b, i) {
       prompt += (i + 1) + ". " + b.name + " – " + b.att + "% (ตกลง " + b.agreed + ", ขาย " + b.sold + ")\n";
     });
     prompt += "\n";
   }
 
-  if (lowBranches.length > 0) {
+  if (data.lowBranches.length > 0) {
     prompt += "สาขาที่ ATT% ต่ำกว่า 15%:\n";
-    lowBranches.forEach(function(b) {
+    data.lowBranches.forEach(function(b) {
       prompt += "* " + b.name + " – " + b.att + "% (ตกลง " + b.agreed + ", ขาย " + b.sold + ")\n";
     });
     prompt += "\n";
@@ -98,9 +89,9 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  var apiKey = process.env.OPENAI_API_KEY;
+  var apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: "OPENAI_API_KEY ไม่ได้ตั้งค่าใน Vercel Environment Variables" });
+    return res.status(500).json({ error: "GEMINI_API_KEY ไม่ได้ตั้งค่าใน Vercel Environment Variables" });
   }
 
   var ip = (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || "unknown";
@@ -116,30 +107,33 @@ module.exports = async function handler(req, res) {
   try {
     var prompt = buildPrompt(validated);
 
-    var response = await fetch("https://api.openai.com/v1/chat/completions", {
+    var geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + apiKey;
+
+    var response = await fetch(geminiUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer " + apiKey,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
-        max_tokens: 2048,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: prompt },
+        system_instruction: {
+          parts: [{ text: SYSTEM_PROMPT }]
+        },
+        contents: [
+          { role: "user", parts: [{ text: prompt }] }
         ],
+        generationConfig: {
+          maxOutputTokens: 2048,
+          temperature: 0.7
+        }
       }),
     });
 
     if (!response.ok) {
       var errBody = await response.text();
-      console.error("OpenAI API error:", response.status, errBody);
-      return res.status(500).json({ error: "OpenAI API error (status " + response.status + ")" });
+      console.error("Gemini API error:", response.status, errBody);
+      return res.status(500).json({ error: "Gemini API error (status " + response.status + ")" });
     }
 
-    var data = await response.json();
-    var text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "ไม่สามารถวิเคราะห์ได้";
+    var result = await response.json();
+    var text = (result.candidates && result.candidates[0] && result.candidates[0].content && result.candidates[0].content.parts && result.candidates[0].content.parts[0] && result.candidates[0].content.parts[0].text) || "ไม่สามารถวิเคราะห์ได้";
     return res.status(200).json({ analysis: text });
   } catch (err) {
     console.error("Trade analysis error:", err.message || err);
