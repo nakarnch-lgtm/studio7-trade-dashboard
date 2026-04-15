@@ -107,14 +107,11 @@ module.exports = async function handler(req, res) {
   try {
     var prompt = buildPrompt(validated);
 
-    var geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
+    var geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + apiKey;
 
     var requestBody = JSON.stringify({
-      system_instruction: {
-        parts: [{ text: SYSTEM_PROMPT }]
-      },
       contents: [
-        { role: "user", parts: [{ text: prompt }] }
+        { role: "user", parts: [{ text: SYSTEM_PROMPT + "\n\n" + prompt }] }
       ],
       generationConfig: {
         maxOutputTokens: 2048,
