@@ -107,34 +107,50 @@ module.exports = async function handler(req, res) {
   try {
     var prompt = buildPrompt(validated);
 
-    var geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + apiKey;
+    var geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=" + apiKey;
 
-    var response = await fetch(geminiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: SYSTEM_PROMPT }]
-        },
-        contents: [
-          { role: "user", parts: [{ text: prompt }] }
-        ],
-        generationConfig: {
-          maxOutputTokens: 2048,
-          temperature: 0.7
-        }
-      }),
+    var requestBody = JSON.stringify({
+      system_instruction: {
+        parts: [{ text: SYSTEM_PROMPT }]
+      },
+      contents: [
+        { role: "user", parts: [{ text: prompt }] }
+      ],
+      generationConfig: {
+        maxOutputTokens: 2048,
+        temperature: 0.7
+      }
     });
 
-    if (!response.ok) {
-      var errBody = await response.text();
-      console.error("Gemini API error:", response.status, errBody);
-      return res.status(500).json({ error: "Gemini API error (status " + response.status + ")" });
+    var lastStatus = 0;
+    var lastErr = "";
+    for (var attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) {
+        await new Promise(function(r) { setTimeout(r, (attempt) * 2000); });
+      }
+
+      var response = await fetch(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: requestBody,
+      });
+
+      if (response.ok) {
+        var result = await response.json();
+        var text = (result.candidates && result.candidates[0] && result.candidates[0].content && result.candidates[0].content.parts && result.candidates[0].content.parts[0] && result.candidates[0].content.parts[0].text) || "ไม่สามารถวิเคราะห์ได้";
+        return res.status(200).json({ analysis: text });
+      }
+
+      lastStatus = response.status;
+      lastErr = await response.text();
+      console.error("Gemini API attempt " + (attempt + 1) + ":", lastStatus, lastErr);
+
+      if (lastStatus !== 429 && lastStatus !== 503) {
+        break;
+      }
     }
 
-    var result = await response.json();
-    var text = (result.candidates && result.candidates[0] && result.candidates[0].content && result.candidates[0].content.parts && result.candidates[0].content.parts[0] && result.candidates[0].content.parts[0].text) || "ไม่สามารถวิเคราะห์ได้";
-    return res.status(200).json({ analysis: text });
+    return res.status(500).json({ error: "Gemini API error (status " + lastStatus + ") — กรุณารอ 10-20 วินาทีแล้วลองใหม่" });
   } catch (err) {
     console.error("Trade analysis error:", err.message || err);
     return res.status(500).json({ error: "Server error: " + (err.message || "unknown") });
