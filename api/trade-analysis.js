@@ -45,7 +45,7 @@ var SYSTEM_PROMPT = "คุณเป็น ASM (Area Sales Manager) ของ St
 function buildPrompt(data) {
   var conversionRate = data.totalEvaluated > 0 ? Math.round((data.totalAgreed / data.totalEvaluated) * 100) : 0;
 
-  var prompt = "สร้างข้อความสรุป Trade-In ตาม template ที่กำหนดไว้ใน system instruction\n\n";
+  var prompt = "สร้างข้อความสรุป Trade-In ตาม template ที่กำหนดไว้ใน system prompt\n\n";
   prompt += "ข้อมูล:\n";
   if (data.period) prompt += "- ช่วงเวลา: " + data.period + "\n";
   if (data.filterContext) prompt += "- ขอบเขต: " + data.filterContext + "\n";
@@ -89,9 +89,9 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  var apiKey = process.env.GEMINI_API_KEY;
+  var apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: "GEMINI_API_KEY ไม่ได้ตั้งค่าใน Vercel Environment Variables" });
+    return res.status(500).json({ error: "GROQ_API_KEY ไม่ได้ตั้งค่าใน Vercel Environment Variables" });
   }
 
   var ip = (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || "unknown";
@@ -107,51 +107,34 @@ module.exports = async function handler(req, res) {
   try {
     var prompt = buildPrompt(validated);
 
-    var geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + apiKey;
-
-    var requestBody = JSON.stringify({
-      contents: [
-        { role: "user", parts: [{ text: SYSTEM_PROMPT + "\n\n" + prompt }] }
-      ],
-      generationConfig: {
-        maxOutputTokens: 2048,
-        temperature: 0.7
-      }
+    var response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + apiKey,
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        max_tokens: 2048,
+        temperature: 0.7,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: prompt },
+        ],
+      }),
     });
 
-    var lastStatus = 0;
-    var lastErr = "";
-    for (var attempt = 0; attempt < 3; attempt++) {
-      if (attempt > 0) {
-        await new Promise(function(r) { setTimeout(r, (attempt) * 2000); });
-      }
-
-      var response = await fetch(geminiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: requestBody,
-      });
-
-      if (response.ok) {
-        var result = await response.json();
-        var text = (result.candidates && result.candidates[0] && result.candidates[0].content && result.candidates[0].content.parts && result.candidates[0].content.parts[0] && result.candidates[0].content.parts[0].text) || "ไม่สามารถวิเคราะห์ได้";
-        return res.status(200).json({ analysis: text });
-      }
-
-      lastStatus = response.status;
-      lastErr = await response.text();
-      console.error("Gemini API attempt " + (attempt + 1) + ":", lastStatus, lastErr);
-
-      if (lastStatus !== 429 && lastStatus !== 503) {
-        break;
-      }
+    if (!response.ok) {
+      var errBody = await response.text();
+      var errorDetail = "";
+      try { var parsed = JSON.parse(errBody); errorDetail = (parsed.error && (parsed.error.message || parsed.error)) || ""; } catch(e) {}
+      console.error("Groq API error:", response.status, errBody);
+      return res.status(500).json({ error: "Groq API error (status " + response.status + ")" + (errorDetail ? ": " + errorDetail : "") });
     }
 
-    var errorDetail = "";
-    try { var parsed = JSON.parse(lastErr); errorDetail = (parsed.error && parsed.error.message) || ""; } catch(e) {}
-    var userMsg = "Gemini API error (status " + lastStatus + ")";
-    if (errorDetail) userMsg += ": " + errorDetail;
-    return res.status(500).json({ error: userMsg });
+    var data = await response.json();
+    var text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "ไม่สามารถวิเคราะห์ได้";
+    return res.status(200).json({ analysis: text });
   } catch (err) {
     console.error("Trade analysis error:", err.message || err);
     return res.status(500).json({ error: "Server error: " + (err.message || "unknown") });
