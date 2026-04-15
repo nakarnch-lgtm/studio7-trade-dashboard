@@ -107,7 +107,7 @@ module.exports = async function handler(req, res) {
   try {
     var prompt = buildPrompt(validated);
 
-    var geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=" + apiKey;
+    var geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
 
     var requestBody = JSON.stringify({
       system_instruction: {
@@ -150,7 +150,11 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    return res.status(500).json({ error: "Gemini API error (status " + lastStatus + ") — กรุณารอ 10-20 วินาทีแล้วลองใหม่" });
+    var errorDetail = "";
+    try { var parsed = JSON.parse(lastErr); errorDetail = (parsed.error && parsed.error.message) || ""; } catch(e) {}
+    var userMsg = "Gemini API error (status " + lastStatus + ")";
+    if (errorDetail) userMsg += ": " + errorDetail;
+    return res.status(500).json({ error: userMsg });
   } catch (err) {
     console.error("Trade analysis error:", err.message || err);
     return res.status(500).json({ error: "Server error: " + (err.message || "unknown") });
