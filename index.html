@@ -1355,7 +1355,7 @@ function renderRMAM(){
   rmData.sort((a,b)=>b.att-a.att||b.agreed-a.agreed);
 
   const natBadge=`<div class="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-full px-3 py-1 mb-4">
-    <span class="text-xs font-bold text-blue-700">🇹🇭 ATT ภาพรวมประเทศ: ${natATT}%</span>
+    <span class="text-xs font-bold text-blue-700">🍎 ATT ภาพรวม BU Apple: ${natATT}%</span>
     <span class="text-[10px] text-blue-400">(ตกลง ${natAgreed} / ขาย ${natSold})</span>
   </div>`;
 
@@ -1376,9 +1376,9 @@ function renderRMAM(){
       const aStyle=attStyle(a.att);
       const aBg=a.att<15?'bg-red-50 border-red-200':'bg-white border-gray-100';
       const aDiffNat=a.att-natATT;
-      const aDiffLabel=aDiffNat>0?`<span class="text-emerald-600 text-[10px] font-bold">▲ ${aDiffNat}% vs ประเทศ</span>`
-                      :aDiffNat<0?`<span class="text-red-500 text-[10px] font-bold">▼ ${Math.abs(aDiffNat)}% vs ประเทศ</span>`
-                      :`<span class="text-gray-400 text-[10px] font-bold">= ประเทศ</span>`;
+      const aDiffLabel=aDiffNat>0?`<span class="text-emerald-600 text-[10px] font-bold">▲ ${aDiffNat}% vs BU</span>`
+                      :aDiffNat<0?`<span class="text-red-500 text-[10px] font-bold">▼ ${Math.abs(aDiffNat)}% vs BU</span>`
+                      :`<span class="text-gray-400 text-[10px] font-bold">= BU</span>`;
 
       const branchRows=a.branches.sort((x,y)=>{
         const ax=pct(sumAllTrades(x).agreed,sumSales(x,devs));
@@ -1671,7 +1671,7 @@ function collectAIData(scope,scopeValue){
   const top3=sorted.filter(b=>b.sold>0).slice(0,3);
   const lowBranches=sorted.filter(b=>b.att<15&&b.sold>0);
   const overallATT=pct(totalAgreed,totalSold);
-  const scopeLabels={country:'ภาพรวมทั้งประเทศ',bu:'BU: '+scopeValue,rm:'RM: '+scopeValue,am:'AM: '+scopeValue};
+  const scopeLabels={country:'ภาพรวม BU Apple',bu:'BU: '+scopeValue,rm:'RM: '+scopeValue,am:'AM: '+scopeValue};
   const filterContext=scopeLabels[scope]||(scopeValue||'ทั้งหมด');
   return{
     filterContext,overallATT,totalSold,totalAgreed,totalEvaluated,
@@ -1701,7 +1701,7 @@ function buildScopeButtons(){
   const amList=hasAMRM?getAvailableScopeValues('am'):[];
 
   const scopes=[
-    {scope:'country',value:'',icon:'🌐',label:'ภาพรวมทั้งประเทศ',sub:'ทุกสาขา ทุก BU/RM/AM',avail:true},
+    {scope:'country',value:'',icon:'🍎',label:'ภาพรวม BU Apple',sub:'ทุกสาขา ทุก RM/AM',avail:true},
     {scope:'bu',value:buVal,icon:'🏢',label:'ราย BU',sub:buVal?'BU: '+buVal:(buList.length?'เลือก BU ก่อน':'ไม่มีข้อมูล BU'),avail:buList.length>0},
     {scope:'rm',value:rmVal,icon:'📍',label:'ราย RM',sub:rmVal?'RM: '+rmVal:(rmList.length?'เลือก RM ก่อน':'ไม่มีข้อมูล RM'),avail:rmList.length>0},
     {scope:'am',value:amVal,icon:'👤',label:'ราย AM',sub:amVal?'AM: '+amVal:(amList.length?'เลือก AM ก่อน':'ไม่มีข้อมูล AM'),avail:amList.length>0},
@@ -1739,7 +1739,7 @@ async function runAIAnalysis(scope,scopeValue){
   document.getElementById('ai-loading').classList.remove('hidden');
   document.getElementById('ai-result').classList.add('hidden');
   document.getElementById('ai-error').classList.add('hidden');
-  const scopeLabels={country:'🌐 ภาพรวมทั้งประเทศ',bu:'🏢 BU: '+scopeValue,rm:'📍 RM: '+scopeValue,am:'👤 AM: '+scopeValue};
+  const scopeLabels={country:'🍎 ภาพรวม BU Apple',bu:'🏢 BU: '+scopeValue,rm:'📍 RM: '+scopeValue,am:'👤 AM: '+scopeValue};
   const sl=document.getElementById('ai-scope-label');
   if(sl) sl.textContent=scopeLabels[scope]||'';
   try{
