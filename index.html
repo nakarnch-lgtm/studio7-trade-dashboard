@@ -1405,7 +1405,7 @@ function renderRMAM(){
           <div class="flex items-center gap-3 min-w-0">
             <span class="text-lg">👤</span>
             <div class="min-w-0">
-              <div class="font-bold text-sm text-gray-800 truncate">${a.am}</div>
+              <div class="font-bold text-sm text-gray-800 truncate"><span class="text-gray-400 font-normal text-[10px] mr-1">AM</span>${a.am}</div>
               <div class="text-[10px] text-gray-400">${a.branches.length} สาขา · ตกลง ${a.agreed} · ขาย ${a.sold}</div>
             </div>
           </div>
@@ -1439,7 +1439,7 @@ function renderRMAM(){
           <div class="flex items-center gap-3 min-w-0">
             <span class="text-2xl">📍</span>
             <div class="min-w-0">
-              <div class="text-white font-bold text-base truncate">${r.rm}</div>
+              <div class="text-white font-bold text-base truncate"><span class="text-white/60 font-normal text-xs mr-1">RM</span>${r.rm}</div>
               <div class="text-white/60 text-xs">${r.branchCount} สาขา · ${r.ams.length} AM · ตกลง ${r.agreed} · ขาย ${r.sold}</div>
             </div>
           </div>
