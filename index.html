@@ -313,33 +313,56 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
 
     <!-- ===== AI ANALYSIS MODAL ===== -->
     <div id="ai-modal" class="hidden fixed inset-0 z-[999] flex items-center justify-center bg-black/40 backdrop-blur-sm" onclick="if(event.target===this)closeAIModal()">
-      <div class="bg-white rounded-2xl shadow-card-lg w-full max-w-lg mx-4 max-h-[80vh] flex flex-col overflow-hidden">
-        <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-violet-600 to-indigo-600 rounded-t-2xl">
+      <div class="bg-white rounded-2xl shadow-card-lg w-full max-w-lg mx-4 max-h-[85vh] flex flex-col overflow-hidden">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-violet-600 to-indigo-600 rounded-t-2xl shrink-0">
           <div class="flex items-center gap-2 text-white">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-            <span class="font-bold text-sm">AI วิเคราะห์ Trade-In</span>
+            <div>
+              <div class="font-bold text-sm">AI วิเคราะห์ Trade-In</div>
+              <div id="ai-scope-label" class="text-[11px] text-white/70"></div>
+            </div>
           </div>
           <button onclick="closeAIModal()" class="text-white/80 hover:text-white text-lg font-bold leading-none">&#x2715;</button>
         </div>
-        <div id="ai-modal-body" class="px-5 py-4 overflow-y-auto flex-1">
-          <div id="ai-loading" class="flex flex-col items-center justify-center py-10">
-            <div class="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin mb-3"></div>
-            <div class="text-sm text-gray-500">AI กำลังวิเคราะห์ข้อมูล…</div>
-          </div>
-          <div id="ai-result" class="hidden">
-            <div class="relative bg-gray-50 rounded-xl border border-gray-100 p-4 mb-3">
-              <div id="ai-text" class="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap pr-2"></div>
+
+        <!-- Step 1: Scope Picker -->
+        <div id="ai-scope-picker" class="px-5 py-5 flex-1">
+          <p class="text-sm font-semibold text-gray-700 mb-1">เลือกขอบเขตการวิเคราะห์</p>
+          <p class="text-xs text-gray-400 mb-4">AI จะสรุปภาพรวมและให้คำแนะนำตาม scope ที่เลือก</p>
+          <div class="grid grid-cols-2 gap-3" id="ai-scope-buttons"></div>
+        </div>
+
+        <!-- Step 2: Loading -->
+        <div id="ai-loading" class="hidden flex flex-col items-center justify-center py-12 flex-1">
+          <div class="w-9 h-9 border-4 border-violet-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+          <div class="text-sm text-gray-500">AI กำลังวิเคราะห์ข้อมูล…</div>
+        </div>
+
+        <!-- Step 3: Result -->
+        <div id="ai-result" class="hidden flex flex-col flex-1 overflow-hidden">
+          <div class="px-5 pt-4 pb-2 overflow-y-auto flex-1">
+            <div class="bg-gray-50 rounded-xl border border-gray-100 p-4 mb-3">
+              <div id="ai-text" class="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap"></div>
             </div>
+          </div>
+          <div class="px-5 pb-4 shrink-0">
             <button onclick="copyAIResult()" id="ai-copy-btn"
-              class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:from-violet-700 hover:to-indigo-700 active:scale-95 transition-all shadow-sm">
+              class="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:from-violet-700 hover:to-indigo-700 active:scale-95 transition-all shadow-sm mb-2">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
               <span id="ai-copy-btn-label">📋 คัดลอกข้อความทั้งหมด</span>
             </button>
+            <button onclick="showAIScopePicker()" class="w-full text-xs text-gray-400 hover:text-violet-600 py-1 transition-colors">
+              ← วิเคราะห์ scope อื่น
+            </button>
+            <div id="ai-copy-status" class="text-xs text-green-600 font-semibold text-center mt-1"></div>
           </div>
-          <div id="ai-error" class="hidden text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3"></div>
         </div>
-        <div id="ai-modal-footer" class="hidden px-5 py-2.5 border-t border-gray-100 flex items-center justify-center bg-gray-50 rounded-b-2xl">
-          <span id="ai-copy-status" class="text-xs text-green-600 font-semibold"></span>
+
+        <!-- Error -->
+        <div id="ai-error" class="hidden px-5 py-4 flex-1">
+          <div class="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-3"></div>
+          <button onclick="showAIScopePicker()" class="w-full text-xs text-gray-400 hover:text-violet-600 py-1 transition-colors">← ลองใหม่</button>
         </div>
       </div>
     </div>
@@ -1432,14 +1455,23 @@ function getAPIBaseURL(){
   return '/api';
 }
 
-function collectAIData(){
+// ===== AI SCOPE HELPERS =====
+function getBranchesForScope(scope,scopeValue){
+  if(!DATA)return null;
+  const allBranches=[...new Set([...Object.keys(DATA.sales_by_branch),...Object.keys(DATA.trade_summary)])];
+  if(scope==='country') return allBranches;
+  if(!DATA.has_amrm||!DATA.branch_amrm) return allBranches;
+  const key={'bu':'bu','rm':'rm','am':'am'}[scope];
+  if(!key||!scopeValue) return allBranches;
+  return allBranches.filter(b=>DATA.branch_amrm[b]&&DATA.branch_amrm[b][key]===scopeValue);
+}
+
+function collectAIData(scope,scopeValue){
   if(!DATA)return null;
   const devs=getSelDevs();
-  const amrmBranches=getAMRMBranches();
-  const allBranches=[...new Set([...Object.keys(DATA.sales_by_branch),...Object.keys(DATA.trade_summary)])];
-  const filtered=amrmBranches?allBranches.filter(b=>amrmBranches.has(b)):allBranches;
+  const branches=getBranchesForScope(scope,scopeValue);
   let totalSold=0,totalAgreed=0,totalEvaluated=0;
-  const branchData=filtered.map(b=>{
+  const branchData=branches.map(b=>{
     const sold=sumSales(b,devs);
     const{agreed,evaluated}=sumAllTrades(b);
     totalSold+=sold;totalAgreed+=agreed;totalEvaluated+=evaluated;
@@ -1449,34 +1481,77 @@ function collectAIData(){
   const top3=sorted.filter(b=>b.sold>0).slice(0,3);
   const lowBranches=sorted.filter(b=>b.att<15&&b.sold>0);
   const overallATT=pct(totalAgreed,totalSold);
-  let filterContext='';
-  const bu=document.getElementById('filter-bu')?.value||'';
-  const rm=document.getElementById('filter-rm')?.value||'';
-  const am=document.getElementById('filter-am')?.value||'';
-  if(bu)filterContext+='BU: '+bu+' ';
-  if(rm)filterContext+='RM: '+rm+' ';
-  if(am)filterContext+='AM: '+am+' ';
-  if(!filterContext)filterContext='ทั้งหมด (ไม่มี filter)';
+  const scopeLabels={country:'ภาพรวมทั้งประเทศ',bu:'BU: '+scopeValue,rm:'RM: '+scopeValue,am:'AM: '+scopeValue};
+  const filterContext=scopeLabels[scope]||(scopeValue||'ทั้งหมด');
   return{
-    filterContext:filterContext.trim(),
-    overallATT,totalSold,totalAgreed,totalEvaluated,
-    branchCount:filtered.length,
+    filterContext,overallATT,totalSold,totalAgreed,totalEvaluated,
+    branchCount:branches.length,
     top3:top3.map(b=>({name:b.name,att:b.att,agreed:b.agreed,sold:b.sold})),
     lowBranches:lowBranches.map(b=>({name:b.name,att:b.att,agreed:b.agreed,sold:b.sold})),
     period:DATA_MONTHS||''
   };
 }
 
+function getAvailableScopeValues(type){
+  if(!DATA||!DATA.has_amrm||!DATA.branch_amrm)return[];
+  const vals=new Set();
+  Object.values(DATA.branch_amrm).forEach(v=>{ if(v[type]) vals.add(v[type]); });
+  return[...vals].sort();
+}
+
+function buildScopeButtons(){
+  const container=document.getElementById('ai-scope-buttons');
+  if(!container)return;
+  const hasAMRM=DATA&&DATA.has_amrm;
+  const buVal=document.getElementById('filter-bu')?.value||'';
+  const rmVal=document.getElementById('filter-rm')?.value||'';
+  const amVal=document.getElementById('filter-am')?.value||'';
+  const buList=hasAMRM?getAvailableScopeValues('bu'):[];
+  const rmList=hasAMRM?getAvailableScopeValues('rm'):[];
+  const amList=hasAMRM?getAvailableScopeValues('am'):[];
+
+  const scopes=[
+    {scope:'country',value:'',icon:'🌐',label:'ภาพรวมทั้งประเทศ',sub:'ทุกสาขา ทุก BU/RM/AM',avail:true},
+    {scope:'bu',value:buVal,icon:'🏢',label:'ราย BU',sub:buVal?'BU: '+buVal:(buList.length?'เลือก BU ก่อน':'ไม่มีข้อมูล BU'),avail:buList.length>0},
+    {scope:'rm',value:rmVal,icon:'📍',label:'ราย RM',sub:rmVal?'RM: '+rmVal:(rmList.length?'เลือก RM ก่อน':'ไม่มีข้อมูล RM'),avail:rmList.length>0},
+    {scope:'am',value:amVal,icon:'👤',label:'ราย AM',sub:amVal?'AM: '+amVal:(amList.length?'เลือก AM ก่อน':'ไม่มีข้อมูล AM'),avail:amList.length>0},
+  ];
+
+  container.innerHTML=scopes.map(s=>{
+    const canRun=s.avail&&(s.scope==='country'||s.value);
+    const needsFilter=s.avail&&s.scope!=='country'&&!s.value;
+    const bg=canRun?'bg-white border-gray-200 hover:border-violet-400 hover:shadow-md cursor-pointer':'bg-gray-50 border-gray-100 opacity-60 cursor-not-allowed';
+    const onclick=canRun?`onclick="runAIAnalysis('${s.scope}','${s.value}')"`:needsFilter?`onclick="showScopeFilterHint('${s.label}')"`:''
+    return`<div ${onclick} class="border rounded-xl p-3.5 transition-all ${bg}">
+      <div class="text-xl mb-1">${s.icon}</div>
+      <div class="text-sm font-bold text-gray-700">${s.label}</div>
+      <div class="text-[11px] ${needsFilter?'text-amber-500':'text-gray-400'} mt-0.5 leading-tight">${s.sub}</div>
+    </div>`;
+  }).join('');
+}
+
+function showScopeFilterHint(label){
+  alert('กรุณาเลือก '+label+' ใน Filter ด้านบนก่อน แล้วกลับมากดวิเคราะห์อีกครั้ง');
+}
+
 let AI_IN_FLIGHT=false;
-async function runAIAnalysis(){
+async function runAIAnalysis(scope,scopeValue){
   if(AI_IN_FLIGHT)return;
+  if(!DATA){alert('กรุณาอัปโหลดและประมวลผลข้อมูลก่อน');return;}
   const base=getAPIBaseURL();
-  const data=collectAIData();
-  if(!data){alert('กรุณาอัปโหลดและประมวลผลข้อมูลก่อน');return;}
+  const data=collectAIData(scope,scopeValue);
+  if(!data)return;
   AI_IN_FLIGHT=true;
   const btn=document.getElementById('ai-analyze-btn');
   if(btn){btn.disabled=true;btn.style.opacity='0.5';btn.style.pointerEvents='none';}
-  showAIModal();
+  // show loading, hide others
+  document.getElementById('ai-scope-picker').classList.add('hidden');
+  document.getElementById('ai-loading').classList.remove('hidden');
+  document.getElementById('ai-result').classList.add('hidden');
+  document.getElementById('ai-error').classList.add('hidden');
+  const scopeLabels={country:'🌐 ภาพรวมทั้งประเทศ',bu:'🏢 BU: '+scopeValue,rm:'📍 RM: '+scopeValue,am:'👤 AM: '+scopeValue};
+  const sl=document.getElementById('ai-scope-label');
+  if(sl) sl.textContent=scopeLabels[scope]||'';
   try{
     const ctrl=new AbortController();
     const timeout=setTimeout(()=>ctrl.abort(),90000);
@@ -1492,28 +1567,35 @@ async function runAIAnalysis(){
     document.getElementById('ai-loading').classList.add('hidden');
     document.getElementById('ai-result').classList.remove('hidden');
     document.getElementById('ai-text').textContent=json.analysis;
-    document.getElementById('ai-modal-footer').classList.remove('hidden');
+    const lbl=document.getElementById('ai-copy-btn-label');
+    if(lbl) lbl.textContent='📋 คัดลอกข้อความทั้งหมด';
+    const cb=document.getElementById('ai-copy-btn');
+    if(cb){cb.classList.add('from-violet-600','to-indigo-600');cb.classList.remove('from-green-500','to-emerald-500');}
+    document.getElementById('ai-copy-status').textContent='';
   }catch(err){
     document.getElementById('ai-loading').classList.add('hidden');
-    document.getElementById('ai-error').classList.remove('hidden');
-    document.getElementById('ai-error').textContent=err.name==='AbortError'?'หมดเวลาการเชื่อมต่อ กรุณาลองใหม่':'เกิดข้อผิดพลาด: '+err.message;
+    const errEl=document.getElementById('ai-error');
+    errEl.classList.remove('hidden');
+    errEl.querySelector('div').textContent=err.name==='AbortError'?'หมดเวลาการเชื่อมต่อ กรุณาลองใหม่':'เกิดข้อผิดพลาด: '+err.message;
   }finally{
     AI_IN_FLIGHT=false;
     if(btn){btn.disabled=false;btn.style.opacity='';btn.style.pointerEvents='';}
   }
 }
 
-function showAIModal(){
-  document.getElementById('ai-loading').classList.remove('hidden');
+function showAIScopePicker(){
+  document.getElementById('ai-scope-picker').classList.remove('hidden');
+  document.getElementById('ai-loading').classList.add('hidden');
   document.getElementById('ai-result').classList.add('hidden');
   document.getElementById('ai-error').classList.add('hidden');
-  document.getElementById('ai-modal-footer').classList.add('hidden');
-  document.getElementById('ai-copy-status').textContent='';
-  const lbl=document.getElementById('ai-copy-btn-label');
-  if(lbl) lbl.textContent='📋 คัดลอกข้อความทั้งหมด';
-  const btn=document.getElementById('ai-copy-btn');
-  if(btn){btn.classList.add('from-violet-600','to-indigo-600');btn.classList.remove('from-green-500','to-emerald-500');}
+  const sl=document.getElementById('ai-scope-label');
+  if(sl) sl.textContent='';
+  buildScopeButtons();
+}
+
+function showAIModal(){
   document.getElementById('ai-modal').classList.remove('hidden');
+  showAIScopePicker();
 }
 function closeAIModal(){
   document.getElementById('ai-modal').classList.add('hidden');
