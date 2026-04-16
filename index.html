@@ -89,7 +89,7 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
     <div>
       <div class="flex items-center gap-2 mb-2.5">
         <span class="w-6 h-6 rounded-full bg-sky-500 text-white flex items-center justify-center text-xs font-black shrink-0">3</span>
-        <span class="text-xs font-bold text-gray-600 uppercase tracking-wide">AM/RM <span class="normal-case text-gray-400 font-normal">(optional)</span></span>
+        <span class="text-xs font-bold text-gray-600 uppercase tracking-wide">ASM/RSM <span class="normal-case text-gray-400 font-normal">(optional)</span></span>
       </div>
       <div id="drop-asm"
         class="drop-zone bg-white rounded-2xl shadow-card border-2 border-dashed border-gray-200 p-6 text-center cursor-pointer transition-all hover:border-sky-400 hover:bg-sky-50"
@@ -97,7 +97,7 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
         ondragover="onDragOver(event,'drop-asm')" ondragleave="onDragLeave('drop-asm')" ondrop="onDrop(event,'asm')">
         <div class="text-3xl mb-2">👥</div>
         <div class="text-sm font-semibold text-gray-700 mb-0.5">คลิกหรือลากไฟล์มาวาง</div>
-        <div class="text-xs text-gray-400">asm_feb / ข้อมูล AM RM</div>
+        <div class="text-xs text-gray-400">asm_feb / ข้อมูล ASM RSM</div>
         <div id="asm-filename" class="hidden mt-3 text-xs font-semibold text-sky-700 bg-sky-50 rounded-xl px-3 py-1.5"></div>
       </div>
       <input type="file" id="input-asm" accept=".xlsx,.xls" class="hidden" onchange="onFileSelect(event,'asm')">
@@ -204,7 +204,7 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
       </button>
       <button id="tab-rmam" onclick="switchView('rmam')"
         class="hidden px-4 py-2 rounded-xl text-sm font-bold transition-all bg-white text-gray-500 shadow-card hover:text-[#1F3B2D]">
-        📍 RM / AM
+        📍 RSM / ASM
       </button>
       <span id="period-badge" class="hidden ml-1 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">📅 เทรดเดือน: <span id="period-label"></span></span>
       <span id="format-badge" class="hidden ml-1 px-3 py-1 rounded-full text-xs font-bold bg-sky-50 text-sky-700 border border-sky-200"></span>
@@ -222,7 +222,7 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
           <div class="w-7 h-7 rounded-lg bg-[#1F3B2D] flex items-center justify-center">
             <svg class="w-4 h-4 text-[#C8A96B]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0"/></svg>
           </div>
-          <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">AM / RM</span>
+          <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">ASM / RSM</span>
         </div>
         <div class="flex flex-wrap gap-2 items-center">
           <div class="flex items-center gap-1.5">
@@ -232,15 +232,15 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
             </select>
           </div>
           <div class="flex items-center gap-1.5">
-            <label class="text-xs text-gray-500 font-semibold">RM:</label>
+            <label class="text-xs text-gray-500 font-semibold">RSM:</label>
             <select id="filter-rm" onchange="onAMRMChange()" class="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#1F3B2D]">
-              <option value="">RM ทั้งหมด</option>
+              <option value="">RSM ทั้งหมด</option>
             </select>
           </div>
           <div class="flex items-center gap-1.5">
-            <label class="text-xs text-gray-500 font-semibold">AM:</label>
+            <label class="text-xs text-gray-500 font-semibold">ASM:</label>
             <select id="filter-am" onchange="onAMRMChange()" class="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#1F3B2D]">
-              <option value="">AM ทั้งหมด</option>
+              <option value="">ASM ทั้งหมด</option>
             </select>
           </div>
           <div class="flex items-center gap-1.5">
@@ -271,7 +271,7 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
     <!-- AM/RM PLACEHOLDER (shows when no AM/RM columns yet) -->
     <div id="amrm-placeholder" class="hidden bg-gray-50 rounded-xl border border-dashed border-gray-200 px-4 py-2.5 mb-3 flex items-center gap-2">
       <span class="text-lg">👥</span>
-      <span class="text-xs text-gray-400 font-medium">ฟิลเตอร์ AM / RM — พร้อมใช้งานเมื่อไฟล์ยอดขายมีคอลัมน์ AM และ RM</span>
+      <span class="text-xs text-gray-400 font-medium">ฟิลเตอร์ ASM / RSM — พร้อมใช้งานเมื่อไฟล์ยอดขายมีคอลัมน์ ASM และ RSM</span>
     </div>
 
     <!-- OVERVIEW SUMMARY CARDS (always visible) -->
@@ -781,7 +781,7 @@ async function processFiles(){
     // Parse ASM mapping file if provided (optional ไฟล์ 3)
     let branchAMRM={}, hasAMRM=false;
     if(fileASM){
-      document.getElementById('loading-msg').textContent='กำลังอ่านข้อมูล AM/RM…';
+      document.getElementById('loading-msg').textContent='กำลังอ่านข้อมูล ASM/RSM…';
       const asmRows=await readXlsx(fileASM);
       branchAMRM=parseASMFile(asmRows, salesKeys, salesBranchIdMap, salesFileIds);
       hasAMRM=Object.keys(branchAMRM).length>0;
@@ -850,8 +850,8 @@ function showDashboard(){
     const rmSel=document.getElementById('filter-rm');
     const amSel=document.getElementById('filter-am');
     const buSel=document.getElementById('filter-bu');
-    rmSel.innerHTML='<option value="">RM ทั้งหมด</option>'+[...rms].sort().map(v=>`<option>${v}</option>`).join('');
-    amSel.innerHTML='<option value="">AM ทั้งหมด</option>'+[...ams].sort().map(v=>`<option>${v}</option>`).join('');
+    rmSel.innerHTML='<option value="">RSM ทั้งหมด</option>'+[...rms].sort().map(v=>`<option>${v}</option>`).join('');
+    amSel.innerHTML='<option value="">ASM ทั้งหมด</option>'+[...ams].sort().map(v=>`<option>${v}</option>`).join('');
     if(buSel) buSel.innerHTML='<option value="">BU ทั้งหมด</option>'+[...bus].sort().map(v=>`<option>${v}</option>`).join('');
     amrmFilter.classList.remove('hidden');
     amrmPlaceholder.classList.add('hidden');
@@ -1312,8 +1312,8 @@ function renderRMAM(){
   // Group branches by RM → AM
   const rmMap={};
   Object.entries(DATA.branch_amrm).forEach(([branch,v])=>{
-    const rm=v.rm||'ไม่ระบุ RM';
-    const am=v.am||'ไม่ระบุ AM';
+    const rm=v.rm||'ไม่ระบุ RSM';
+    const am=v.am||'ไม่ระบุ ASM';
     if(!rmMap[rm])rmMap[rm]={ams:{}};
     if(!rmMap[rm].ams[am])rmMap[rm].ams[am]=[];
     rmMap[rm].ams[am].push(branch);
@@ -1346,7 +1346,7 @@ function renderRMAM(){
 
   if(filterRM){
     const idx=rmData.findIndex(r=>r.rm===filterRM);
-    if(idx<0){ wrap.innerHTML='<div class="py-14 text-center text-gray-400 text-sm">ไม่พบข้อมูล RM ที่เลือก</div>'; return; }
+    if(idx<0){ wrap.innerHTML='<div class="py-14 text-center text-gray-400 text-sm">ไม่พบข้อมูล RSM ที่เลือก</div>'; return; }
     const filtered=[rmData[idx]];
     rmData.length=0;
     filtered.forEach(r=>rmData.push(r));
@@ -1360,7 +1360,7 @@ function renderRMAM(){
   </div>`;
 
   if(rmData.length===0){
-    wrap.innerHTML=natBadge+'<div class="py-14 text-center text-gray-400 text-sm">ไม่มีข้อมูล RM/AM ในช่วงที่เลือก</div>';
+    wrap.innerHTML=natBadge+'<div class="py-14 text-center text-gray-400 text-sm">ไม่มีข้อมูล RSM/ASM ในช่วงที่เลือก</div>';
     return;
   }
 
@@ -1405,7 +1405,7 @@ function renderRMAM(){
           <div class="flex items-center gap-3 min-w-0">
             <span class="text-lg">👤</span>
             <div class="min-w-0">
-              <div class="font-bold text-sm text-gray-800 truncate"><span class="text-gray-400 font-normal text-[10px] mr-1">AM</span>${a.am}</div>
+              <div class="font-bold text-sm text-gray-800 truncate"><span class="text-gray-400 font-normal text-[10px] mr-1">ASM</span>${a.am}</div>
               <div class="text-[10px] text-gray-400">${a.branches.length} สาขา · ตกลง ${a.agreed} · ขาย ${a.sold}</div>
             </div>
           </div>
@@ -1439,8 +1439,8 @@ function renderRMAM(){
           <div class="flex items-center gap-3 min-w-0">
             <span class="text-2xl">📍</span>
             <div class="min-w-0">
-              <div class="text-white font-bold text-base truncate"><span class="text-white/60 font-normal text-xs mr-1">RM</span>${r.rm}</div>
-              <div class="text-white/60 text-xs">${r.branchCount} สาขา · ${r.ams.length} AM · ตกลง ${r.agreed} · ขาย ${r.sold}</div>
+              <div class="text-white font-bold text-base truncate"><span class="text-white/60 font-normal text-xs mr-1">RSM</span>${r.rm}</div>
+              <div class="text-white/60 text-xs">${r.branchCount} สาขา · ${r.ams.length} ASM · ตกลง ${r.agreed} · ขาย ${r.sold}</div>
             </div>
           </div>
           <div class="text-right shrink-0 flex items-center gap-2">
@@ -1671,7 +1671,7 @@ function collectAIData(scope,scopeValue){
   const top3=sorted.filter(b=>b.sold>0).slice(0,3);
   const lowBranches=sorted.filter(b=>b.att<15&&b.sold>0);
   const overallATT=pct(totalAgreed,totalSold);
-  const scopeLabels={country:'ภาพรวม BU Apple',bu:'BU: '+scopeValue,rm:'RM: '+scopeValue,am:'AM: '+scopeValue};
+  const scopeLabels={country:'ภาพรวม BU Apple',bu:'BU: '+scopeValue,rm:'RSM: '+scopeValue,am:'ASM: '+scopeValue};
   const filterContext=scopeLabels[scope]||(scopeValue||'ทั้งหมด');
   return{
     filterContext,overallATT,totalSold,totalAgreed,totalEvaluated,
@@ -1701,10 +1701,10 @@ function buildScopeButtons(){
   const amList=hasAMRM?getAvailableScopeValues('am'):[];
 
   const scopes=[
-    {scope:'country',value:'',icon:'🍎',label:'ภาพรวม BU Apple',sub:'ทุกสาขา ทุก RM/AM',avail:true},
+    {scope:'country',value:'',icon:'🍎',label:'ภาพรวม BU Apple',sub:'ทุกสาขา ทุก RSM/ASM',avail:true},
     {scope:'bu',value:buVal,icon:'🏢',label:'ราย BU',sub:buVal?'BU: '+buVal:(buList.length?'เลือก BU ก่อน':'ไม่มีข้อมูล BU'),avail:buList.length>0},
-    {scope:'rm',value:rmVal,icon:'📍',label:'ราย RM',sub:rmVal?'RM: '+rmVal:(rmList.length?'เลือก RM ก่อน':'ไม่มีข้อมูล RM'),avail:rmList.length>0},
-    {scope:'am',value:amVal,icon:'👤',label:'ราย AM',sub:amVal?'AM: '+amVal:(amList.length?'เลือก AM ก่อน':'ไม่มีข้อมูล AM'),avail:amList.length>0},
+    {scope:'rm',value:rmVal,icon:'📍',label:'ราย RSM',sub:rmVal?'RSM: '+rmVal:(rmList.length?'เลือก RSM ก่อน':'ไม่มีข้อมูล RSM'),avail:rmList.length>0},
+    {scope:'am',value:amVal,icon:'👤',label:'ราย ASM',sub:amVal?'ASM: '+amVal:(amList.length?'เลือก ASM ก่อน':'ไม่มีข้อมูล ASM'),avail:amList.length>0},
   ];
 
   container.innerHTML=scopes.map(s=>{
@@ -1739,7 +1739,7 @@ async function runAIAnalysis(scope,scopeValue){
   document.getElementById('ai-loading').classList.remove('hidden');
   document.getElementById('ai-result').classList.add('hidden');
   document.getElementById('ai-error').classList.add('hidden');
-  const scopeLabels={country:'🍎 ภาพรวม BU Apple',bu:'🏢 BU: '+scopeValue,rm:'📍 RM: '+scopeValue,am:'👤 AM: '+scopeValue};
+  const scopeLabels={country:'🍎 ภาพรวม BU Apple',bu:'🏢 BU: '+scopeValue,rm:'📍 RSM: '+scopeValue,am:'👤 ASM: '+scopeValue};
   const sl=document.getElementById('ai-scope-label');
   if(sl) sl.textContent=scopeLabels[scope]||'';
   try{
