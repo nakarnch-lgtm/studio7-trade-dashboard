@@ -202,6 +202,10 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
         class="px-4 py-2 rounded-xl text-sm font-bold transition-all bg-white text-gray-500 shadow-card hover:text-[#1F3B2D]">
         👤 รายพนักงาน
       </button>
+      <button id="tab-rmam" onclick="switchView('rmam')"
+        class="hidden px-4 py-2 rounded-xl text-sm font-bold transition-all bg-white text-gray-500 shadow-card hover:text-[#1F3B2D]">
+        📍 RM / AM
+      </button>
       <span id="period-badge" class="hidden ml-1 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">📅 เทรดเดือน: <span id="period-label"></span></span>
       <span id="format-badge" class="hidden ml-1 px-3 py-1 rounded-full text-xs font-bold bg-sky-50 text-sky-700 border border-sky-200"></span>
       <button id="ai-analyze-btn" onclick="runAIAnalysis()"
@@ -309,6 +313,11 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
         <div class="w-3 h-3 rounded-sm bg-red-100 border border-red-300"></div>
         <span>ATT% ต่ำกว่า 15% — ต้องพัฒนา</span>
       </div>
+    </div>
+
+    <!-- ===== VIEW: RM / AM BREAKDOWN ===== -->
+    <div id="view-rmam" class="hidden">
+      <div id="rmam-content"></div>
     </div>
 
     <!-- ===== AI ANALYSIS MODAL ===== -->
@@ -846,6 +855,7 @@ function showDashboard(){
     if(buSel) buSel.innerHTML='<option value="">BU ทั้งหมด</option>'+[...bus].sort().map(v=>`<option>${v}</option>`).join('');
     amrmFilter.classList.remove('hidden');
     amrmPlaceholder.classList.add('hidden');
+    document.getElementById('tab-rmam').classList.remove('hidden');
   } else if(DATA){
     // ไม่มี ASM แต่ยังแสดง branch filter
     amrmFilter.classList.remove('hidden');
@@ -952,12 +962,16 @@ function switchView(v){
   document.getElementById('view-detail').classList.toggle('hidden', v!=='detail');
   document.getElementById('view-emp').classList.toggle('hidden', v!=='emp');
   document.getElementById('view-drill').classList.toggle('hidden', v!=='drill');
+  document.getElementById('view-rmam').classList.toggle('hidden', v!=='rmam');
   const A='px-4 py-2 rounded-xl text-sm font-bold transition-all bg-[#1F3B2D] text-white shadow-card';
   const I='px-4 py-2 rounded-xl text-sm font-bold transition-all bg-white text-gray-500 shadow-card hover:text-[#1F3B2D]';
   document.getElementById('tab-summary').className = v==='summary'?A:I;
   document.getElementById('tab-detail').className  = v==='detail'?A:I;
   document.getElementById('tab-emp').className     = v==='emp'?A:I;
+  const rmamTab=document.getElementById('tab-rmam');
+  if(rmamTab&&!rmamTab.classList.contains('hidden')) rmamTab.className = (v==='rmam'?A:I)+' inline-block';
   if(v==='emp'&&DATA) renderEmpSummary(getSelDevs(), getAMRMBranches());
+  if(v==='rmam'&&DATA) renderRMAM();
 }
 
 // ===== BRANCH CHECKBOX DROPDOWN =====
@@ -1283,6 +1297,172 @@ function renderEmpPage(page){
     </div>`;
 }
 
+// ===== RM / AM BREAKDOWN =====
+function renderRMAM(){
+  const wrap=document.getElementById('rmam-content');
+  if(!wrap||!DATA||!DATA.has_amrm)return;
+  const devs=getSelDevs();
+
+  // National ATT%
+  const allBr=[...(DATA.all_branch_names||new Set([...Object.keys(DATA.sales_by_branch),...Object.keys(DATA.trade_summary)]))];
+  let natSold=0,natAgreed=0;
+  allBr.forEach(b=>{natSold+=sumSales(b,devs);natAgreed+=sumAllTrades(b).agreed;});
+  const natATT=pct(natAgreed,natSold);
+
+  // Group branches by RM → AM
+  const rmMap={};
+  Object.entries(DATA.branch_amrm).forEach(([branch,v])=>{
+    const rm=v.rm||'ไม่ระบุ RM';
+    const am=v.am||'ไม่ระบุ AM';
+    if(!rmMap[rm])rmMap[rm]={ams:{}};
+    if(!rmMap[rm].ams[am])rmMap[rm].ams[am]=[];
+    rmMap[rm].ams[am].push(branch);
+  });
+
+  // Apply current filter
+  const filterBU=document.getElementById('filter-bu')?.value||'';
+  const filterRM=document.getElementById('filter-rm')?.value||'';
+  const filterAM=document.getElementById('filter-am')?.value||'';
+
+  // Calculate RM-level data
+  const rmData=Object.entries(rmMap).map(([rm,data])=>{
+    const amEntries=Object.entries(data.ams).map(([am,branches])=>{
+      // filter by BU/AM if active
+      const filtered=branches.filter(b=>{
+        const info=DATA.branch_amrm[b];
+        if(filterBU&&info?.bu!==filterBU)return false;
+        if(filterAM&&info?.am!==filterAM)return false;
+        return true;
+      });
+      let sold=0,agreed=0,evaluated=0;
+      filtered.forEach(b=>{sold+=sumSales(b,devs);const t=sumAllTrades(b);agreed+=t.agreed;evaluated+=t.evaluated;});
+      return{am,branches:filtered,sold,agreed,evaluated,att:pct(agreed,sold)};
+    }).filter(a=>a.branches.length>0).sort((a,b)=>b.att-a.att||b.agreed-a.agreed);
+    if(amEntries.length===0)return null;
+    let rmSold=0,rmAgreed=0,rmEval=0,rmBranches=0;
+    amEntries.forEach(a=>{rmSold+=a.sold;rmAgreed+=a.agreed;rmEval+=a.evaluated;rmBranches+=a.branches.length;});
+    return{rm,ams:amEntries,sold:rmSold,agreed:rmAgreed,evaluated:rmEval,att:pct(rmAgreed,rmSold),branchCount:rmBranches};
+  }).filter(Boolean);
+
+  if(filterRM){
+    const idx=rmData.findIndex(r=>r.rm===filterRM);
+    if(idx<0){ wrap.innerHTML='<div class="py-14 text-center text-gray-400 text-sm">ไม่พบข้อมูล RM ที่เลือก</div>'; return; }
+    const filtered=[rmData[idx]];
+    rmData.length=0;
+    filtered.forEach(r=>rmData.push(r));
+  }
+
+  rmData.sort((a,b)=>b.att-a.att||b.agreed-a.agreed);
+
+  const natBadge=`<div class="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-full px-3 py-1 mb-4">
+    <span class="text-xs font-bold text-blue-700">🇹🇭 ATT ภาพรวมประเทศ: ${natATT}%</span>
+    <span class="text-[10px] text-blue-400">(ตกลง ${natAgreed} / ขาย ${natSold})</span>
+  </div>`;
+
+  if(rmData.length===0){
+    wrap.innerHTML=natBadge+'<div class="py-14 text-center text-gray-400 text-sm">ไม่มีข้อมูล RM/AM ในช่วงที่เลือก</div>';
+    return;
+  }
+
+  wrap.innerHTML=natBadge+rmData.map((r,ri)=>{
+    const rmStyle=attStyle(r.att);
+    const rmBg=r.att<15?'#CA3433':'#1F3B2D';
+    const diffNat=r.att-natATT;
+    const diffLabel=diffNat>0?`<span class="text-emerald-400 text-xs font-bold ml-1">+${diffNat}%</span>`
+                    :diffNat<0?`<span class="text-red-300 text-xs font-bold ml-1">${diffNat}%</span>`
+                    :`<span class="text-white/50 text-xs font-bold ml-1">±0%</span>`;
+
+    const amCards=r.ams.map((a,ai)=>{
+      const aStyle=attStyle(a.att);
+      const aBg=a.att<15?'bg-red-50 border-red-200':'bg-white border-gray-100';
+      const aDiffNat=a.att-natATT;
+      const aDiffLabel=aDiffNat>0?`<span class="text-emerald-600 text-[10px] font-bold">▲ ${aDiffNat}% vs ประเทศ</span>`
+                      :aDiffNat<0?`<span class="text-red-500 text-[10px] font-bold">▼ ${Math.abs(aDiffNat)}% vs ประเทศ</span>`
+                      :`<span class="text-gray-400 text-[10px] font-bold">= ประเทศ</span>`;
+
+      const branchRows=a.branches.sort((x,y)=>{
+        const ax=pct(sumAllTrades(x).agreed,sumSales(x,devs));
+        const bx=pct(sumAllTrades(y).agreed,sumSales(y,devs));
+        return bx-ax;
+      }).map((b,bi)=>{
+        const bSold=sumSales(b,devs);
+        const bT=sumAllTrades(b);
+        const bAtt=pct(bT.agreed,bSold);
+        const bDanger=bAtt<15;
+        const rowBg=bDanger?'bg-red-50':'';
+        return`<tr class="${rowBg} border-b border-gray-100 text-xs">
+          <td class="px-2 py-1.5 text-gray-400 text-center">${bi+1}</td>
+          <td class="px-2 py-1.5 font-medium text-gray-700 truncate" title="${b}">${b}${bDanger?' <span class="text-red-500">⚠</span>':''}</td>
+          <td class="px-2 py-1.5 text-center font-bold text-emerald-600">${bT.agreed}</td>
+          <td class="px-2 py-1.5 text-center text-gray-500">${bT.evaluated}</td>
+          <td class="px-2 py-1.5 text-center font-semibold text-[#9E7A3F]">${bSold}</td>
+          <td class="px-2 py-1.5 text-right font-black ${bDanger?'text-red-600':bAtt>=60?'text-emerald-600':'text-amber-600'}">${bAtt}%</td>
+        </tr>`;
+      }).join('');
+
+      return`<div class="border ${aBg} rounded-xl overflow-hidden shadow-sm">
+        <div class="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors" onclick="this.nextElementSibling.classList.toggle('hidden');this.querySelector('.rmam-chevron').classList.toggle('rotate-180')">
+          <div class="flex items-center gap-3 min-w-0">
+            <span class="text-lg">👤</span>
+            <div class="min-w-0">
+              <div class="font-bold text-sm text-gray-800 truncate">${a.am}</div>
+              <div class="text-[10px] text-gray-400">${a.branches.length} สาขา · ตกลง ${a.agreed} · ขาย ${a.sold}</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            ${aDiffLabel}
+            <div class="text-right">
+              <div class="text-xl font-black" style="color:${aStyle.hex}">${a.att}%</div>
+              <div class="text-[10px] text-gray-400 font-semibold">ATT</div>
+            </div>
+            <svg class="w-4 h-4 text-gray-400 transition-transform rmam-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </div>
+        </div>
+        <div class="hidden border-t border-gray-100">
+          <table class="w-full"><thead>
+            <tr class="bg-gray-50 text-[10px] text-gray-500 uppercase">
+              <th class="px-2 py-1.5 w-8">#</th>
+              <th class="px-2 py-1.5 text-left">สาขา</th>
+              <th class="px-2 py-1.5 text-center w-12">ตกลง</th>
+              <th class="px-2 py-1.5 text-center w-14">ประเมิน</th>
+              <th class="px-2 py-1.5 text-center w-12">ขาย</th>
+              <th class="px-2 py-1.5 text-right w-14">ATT%</th>
+            </tr>
+          </thead><tbody>${branchRows}</tbody></table>
+        </div>
+      </div>`;
+    }).join('');
+
+    return`<div class="mb-5">
+      <div class="rounded-2xl overflow-hidden shadow-card">
+        <div class="px-5 py-4 flex items-center justify-between" style="background:${rmBg}">
+          <div class="flex items-center gap-3 min-w-0">
+            <span class="text-2xl">📍</span>
+            <div class="min-w-0">
+              <div class="text-white font-bold text-base truncate">${r.rm}</div>
+              <div class="text-white/60 text-xs">${r.branchCount} สาขา · ${r.ams.length} AM · ตกลง ${r.agreed} · ขาย ${r.sold}</div>
+            </div>
+          </div>
+          <div class="text-right shrink-0 flex items-center gap-2">
+            ${diffLabel}
+            <div>
+              <div class="text-3xl font-black text-white">${r.att}%</div>
+              <div class="text-white/60 text-xs font-semibold -mt-0.5">ATT</div>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white px-4 py-3 grid grid-cols-4 gap-2 border-b border-gray-100">
+          <div class="bg-gray-50 rounded-lg p-2 text-center"><div class="text-sm font-black text-gray-700">${r.branchCount}</div><div class="text-[10px] text-gray-400">สาขา</div></div>
+          <div class="bg-emerald-50 rounded-lg p-2 text-center"><div class="text-sm font-black text-emerald-600">${r.agreed}</div><div class="text-[10px] text-emerald-400">ตกลง</div></div>
+          <div class="bg-gray-50 rounded-lg p-2 text-center"><div class="text-sm font-black text-gray-700">${r.evaluated}</div><div class="text-[10px] text-gray-400">ประเมิน</div></div>
+          <div class="bg-[#FDF6E8] rounded-lg p-2 text-center"><div class="text-sm font-black text-[#9E7A3F]">${r.sold}</div><div class="text-[10px] text-[#C8A96B]">ขาย</div></div>
+        </div>
+        <div class="bg-white p-4 flex flex-col gap-3">${amCards}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 // ===== HELPERS =====
 function pct(a,b){ return b>0?Math.round(a/b*100):0; }
 function attStyle(p){
@@ -1397,6 +1577,7 @@ function render(){
 
   renderSummary(sorted, devs);
   if(currentView==='emp') renderEmpSummary(devs, amrmBranches);
+  if(currentView==='rmam') renderRMAM();
 
   document.getElementById('trade-cards').innerHTML=sorted.map(({b:branch},bi)=>{
     const salesTotal=sumSales(branch,devs);
