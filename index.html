@@ -778,6 +778,14 @@ async function processFiles(){
       hasAMRM=Object.keys(branchAMRM).length>0;
     }
 
+    // all_branches_set = ชื่อสาขาทั้งหมดจาก salesBranchIdMap (หลัง PASS 2.5) + trade + sales
+    // ใช้เป็น canonical pool เพื่อให้แสดงครบ 194 สาขาแม้บางสาขาไม่มี device sales
+    const allBranchNames=new Set([
+      ...Object.values(salesBranchIdMap),
+      ...Object.keys(salesByBranch),
+      ...Object.keys(tradeSummary).filter(b=>b!=='Unknown')
+    ]);
+
     DATA={
       sales_by_branch:salesByBranch,
       trade_summary:tradeSummary,
@@ -787,7 +795,8 @@ async function processFiles(){
       emp_names:empNameMap,
       emp_branch:salesEmpBranch,
       branch_amrm:branchAMRM,
-      has_amrm:hasAMRM
+      has_amrm:hasAMRM,
+      all_branch_names:allBranchNames
     };
     showDashboard();
   }catch(err){
@@ -979,7 +988,7 @@ function updateBranchCheckboxes(){
       listBranches.add(b);
     });
   } else {
-    listBranches=new Set([...Object.keys(DATA.trade_summary||{}),...Object.keys(DATA.sales_by_branch||{})]);
+    listBranches=DATA.all_branch_names||new Set([...Object.keys(DATA.trade_summary||{}),...Object.keys(DATA.sales_by_branch||{})]);
   }
   const list=document.getElementById('branch-checkbox-list');
   if(!list) return;
@@ -1317,12 +1326,12 @@ function render(){
   DEV_KEYS.forEach(d=>{ const el=document.getElementById('cnt-'+d); if(el)el.textContent=devTotals[d]; });
 
   const amrmBranches=getAMRMBranches(); // Set หรือ null
-  // รวมสาขาจาก 3 แหล่ง: sales + trade + ASM territory (เมื่อกรอง BU/RM/AM)
-  const _pool=new Set([
+  // รวมสาขาจาก all_branch_names (ครบทุกสาขาจาก sales ID map + trade + device sales)
+  const _pool=new Set(DATA.all_branch_names||[
     ...Object.keys(DATA.sales_by_branch),
     ...Object.keys(DATA.trade_summary).filter(b=>b!=='Unknown')
   ]);
-  // กรอง AM → เพิ่มทุกสาขาใน territory แม้ยังไม่มีข้อมูล (แสดง 0)
+  // กรอง AM/RM/BU → เพิ่มทุกสาขาใน territory แม้ยังไม่มีข้อมูล (แสดง 0)
   if(amrmBranches&&!amrmBranches.has('__no_match__'))
     amrmBranches.forEach(b=>_pool.add(b));
   const allBranches=[..._pool].sort().filter(b=>!amrmBranches||amrmBranches.has(b));
@@ -1458,8 +1467,8 @@ function getAPIBaseURL(){
 // ===== AI SCOPE HELPERS =====
 function getBranchesForScope(scope,scopeValue){
   if(!DATA)return null;
-  const allBranches=[...new Set([...Object.keys(DATA.sales_by_branch),...Object.keys(DATA.trade_summary)])];
-  if(scope==='country') return allBranches;
+  const allBranches=[...(DATA.all_branch_names||new Set([...Object.keys(DATA.sales_by_branch),...Object.keys(DATA.trade_summary)]))];
+  if(scope==='country') return allBranches.filter(b=>b!=='Unknown');
   if(!DATA.has_amrm||!DATA.branch_amrm) return allBranches;
   const key={'bu':'bu','rm':'rm','am':'am'}[scope];
   if(!key||!scopeValue) return allBranches;
