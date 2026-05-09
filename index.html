@@ -533,7 +533,9 @@ function matchBranch(reportName, salesKeys){
   for(const e of lk.entries){
     const common=[...e.words].filter(w=>rw.has(w)).length;
     const shorter=Math.min(rw.size,e.words.size);
-    if(common>=3&&common/shorter>=0.6&&common>bestScore){ bestScore=common; bestK=e.key; }
+    // สำหรับชื่อสาขาที่มีแค่ 2 คำ (เช่น "bigc lamlukka1") ลด threshold เหลือ 2 คำ
+    const need=shorter<=2?Math.max(shorter,1):3;
+    if(common>=need&&common/shorter>=0.6&&common>bestScore){ bestScore=common; bestK=e.key; }
   }
   const result=bestK||reportName;
   _matchCache.set(reportName,result);
@@ -632,18 +634,28 @@ function parseTradeSearch(rows, activeDates, salesKeys, empNameMap={}, salesBran
   const byEmp={};
   rows.forEach(r=>{
     // ใช้ branch_code (ID ตัวเลข) จับคู่กับ salesBranchIdMap ก่อน เพื่อหลีกเลี่ยงปัญหาสะกดชื่อต่างกัน
-    let branch;
+    let branch, isMatchedToSales;
     const rawCode=s(r['branch_code']||'');
     const branchId=rawCode?String(parseInt(rawCode,10)||0):'';
     if(branchId&&branchId!=='0'&&salesBranchIdMap[branchId]){
       branch=salesBranchIdMap[branchId];
+      isMatchedToSales=true;
     } else {
       const rawBranch=s(r['ชื่อสาขา']||r['BRANCH_NAME']||'');
       if(!rawBranch)return;
-      branch=matchBranch(rawBranch,salesKeys)||rawBranch;
+      const nameMatch=matchBranch(rawBranch,salesKeys);
+      if(nameMatch&&nameMatch!==rawBranch){
+        branch=nameMatch;
+        isMatchedToSales=true;
+      } else {
+        // ไม่สามารถ match กับ sales file ได้ → ใช้ชื่อดิบ และไม่ filter ตามวันที่
+        // เพื่อให้สาขาที่ไม่มีใน sales file ยังแสดงใน dashboard ได้
+        branch=rawBranch;
+        isMatchedToSales=false;
+      }
     }
-    // date filter (CE format DD/MM/YYYY)
-    if(activeDates.size>0){
+    // date filter (CE format DD/MM/YYYY) — เฉพาะสาขาที่อยู่ใน sales file เท่านั้น
+    if(isMatchedToSales&&activeDates.size>0){
       const td=s(r['วันที่คำสั่งเทรด']||'');
       if(!activeDates.has(td))return;
     }
@@ -868,7 +880,7 @@ async function processFiles(){
     const AGREED_ST_YM=new Set([5,7]);
     const tradeByYm={};
     if(tradeFormat==='search'){
-      // derive from raw transaction rows (all rows, no activeDates filter)
+      // derive from raw transaction rows — ไม่ filter ตามวันที่ (เพื่อให้ครบทุกสาขา ทุกเดือน)
       tRows.forEach(r=>{
         let branch;
         const rawCode=s(r['branch_code']||'');
@@ -878,7 +890,8 @@ async function processFiles(){
         } else {
           const rawBranch=s(r['ชื่อสาขา']||r['BRANCH_NAME']||'');
           if(!rawBranch)return;
-          branch=matchBranch(rawBranch,salesKeys)||rawBranch;
+          const nm=matchBranch(rawBranch,salesKeys);
+          branch=(nm&&nm!==rawBranch)?nm:rawBranch;
         }
         const td=s(r['วันที่คำสั่งเทรด']||'');
         const tm=td.match(/(\d{2})\/(\d{2})\/(\d{4})/);
