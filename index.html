@@ -1406,8 +1406,7 @@ function buildBranchYearChart(){
   entities.sort((a,b)=>Math.max(b.att1,b.att2)-Math.max(a.att1,a.att2)||b.a2-a.a2);
   entities=entities.slice(0,20);
 
-  const maxAtt=Math.max(...entities.map(r=>Math.max(r.att1,r.att2)),baseAtt,1);
-  const refPx=Math.round(baseAtt/maxAtt*CHART_H);
+  const maxAtt=Math.max(...entities.map(r=>Math.max(r.att1,r.att2)),1);
 
   const bars=entities.map(r=>{
     const h2=r.att2>0?Math.max(Math.round(r.att2/maxAtt*CHART_H),3):0;
@@ -1469,10 +1468,8 @@ function buildBranchYearChart(){
 
   const legend=multiYear
     ?`<span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;background:${COL1};border-radius:2px;opacity:0.9"></span>Year ${be1} (ปี ${yr1+543})</span>
-      <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;background:${COL2};border-radius:2px"></span>Year ${be2} (ปี ${yr2+543})</span>
-      <span class="flex items-center gap-1"><span style="display:inline-block;width:18px;border-top:2px dashed #ef4444"></span>Store Base</span>`
-    :`<span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;background:${COL2};border-radius:2px"></span>ATT% (4 เดือนล่าสุด)</span>
-      <span class="flex items-center gap-1"><span style="display:inline-block;width:18px;border-top:2px dashed #ef4444"></span>Store Base</span>`;
+      <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;background:${COL2};border-radius:2px"></span>Year ${be2} (ปี ${yr2+543})</span>`
+    :`<span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;background:${COL2};border-radius:2px"></span>ATT% (4 เดือนล่าสุด)</span>`;
 
   const chartTitle=multiYear
     ?`📊 Performance Chart — ปี ${yr1+543} vs ${yr2+543}`
@@ -1494,9 +1491,6 @@ function buildBranchYearChart(){
     </div>
     <div style="overflow-x:auto;padding-bottom:4px">
       <div style="display:flex;align-items:flex-end;gap:4px;min-height:${CHART_H+20}px;padding-bottom:2px;min-width:max-content;position:relative">
-        <div style="position:absolute;bottom:${refPx}px;left:0;right:0;border-top:2px dashed #ef4444;z-index:1;pointer-events:none">
-          <span style="position:absolute;right:4px;top:-14px;font-size:9px;color:#ef4444;font-weight:700">Base ${baseAtt}%</span>
-        </div>
         ${bars}
       </div>
     </div>
@@ -1540,8 +1534,7 @@ function buildAMBranchCompare(yr1,yr2,be1,be2,COL1,COL2,baseAtt){
 
   branchData.sort((a,b)=>Math.max(b.att1,b.att2)-Math.max(a.att1,a.att2));
   const CHART_H=100;
-  const maxAtt=Math.max(...branchData.map(r=>Math.max(r.att1,r.att2)),baseAtt,1);
-  const refPx=Math.round(baseAtt/maxAtt*CHART_H);
+  const maxAtt=Math.max(...branchData.map(r=>Math.max(r.att1,r.att2)),1);
 
   const bars=branchData.map(r=>{
     const h1=r.att1>0?Math.max(Math.round(r.att1/maxAtt*CHART_H),3):0;
@@ -1567,16 +1560,12 @@ function buildAMBranchCompare(yr1,yr2,be1,be2,COL1,COL2,baseAtt){
     </div>
     <div style="overflow-x:auto;padding-bottom:4px">
       <div style="display:flex;align-items:flex-end;gap:4px;min-height:${CHART_H+20}px;padding-bottom:2px;min-width:max-content;position:relative">
-        <div style="position:absolute;bottom:${refPx}px;left:0;right:0;border-top:2px dashed #ef4444;z-index:1;pointer-events:none">
-          <span style="position:absolute;right:4px;top:-14px;font-size:9px;color:#ef4444;font-weight:700">Base ${baseAtt}%</span>
-        </div>
         ${bars}
       </div>
     </div>
     <div class="flex items-center gap-4 mt-2 text-xs text-gray-400">
       <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;background:${COL1};border-radius:2px;opacity:0.9"></span>Year ${be1}</span>
       <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;background:${COL2};border-radius:2px"></span>Year ${be2}</span>
-      <span class="flex items-center gap-1"><span style="display:inline-block;width:18px;border-top:2px dashed #ef4444"></span>Store Base</span>
     </div>
   </div>`;
 }
