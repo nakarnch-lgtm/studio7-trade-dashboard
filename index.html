@@ -219,6 +219,16 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
       </button>
     </div>
 
+    <!-- MONTH / YEAR FILTER (global — applies to all tabs) -->
+    <div id="ym-filter-bar" class="hidden bg-white rounded-xl shadow-card px-4 py-2.5 mb-3">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs font-bold text-gray-500 uppercase tracking-wider shrink-0">📅 เดือน:</span>
+        <div class="flex flex-wrap gap-1.5" id="ym-chips"></div>
+        <button onclick="resetYMFilter()" id="ym-reset-btn"
+          class="text-xs text-gray-400 hover:text-gray-600 underline ml-auto shrink-0">ทั้งหมด</button>
+      </div>
+    </div>
+
     <!-- AM/RM FILTER (shows when columns exist in sales file) -->
     <div id="amrm-filter" class="hidden bg-white rounded-xl shadow-card px-4 py-3 mb-3">
       <div class="flex flex-wrap items-center gap-3">
@@ -432,6 +442,7 @@ let DATA = null, fileSales = [], fileTrade = [], fileASM = null, DATA_MONTHS = '
 let RAW_SALES_ROWS = [], RAW_TRADE_ROWS = [], SALES_COL_KEYS = null;
 let DRILL_BRANCH = null;
 let SELECTED_BRANCHES = new Set(); // empty = all; หรือ Set ของ branch ที่เลือก
+let SELECTED_YM = null;           // "YYYY-MM" หรือ null = ทั้งหมด
 
 // ปิด branch dropdown เมื่อคลิกนอก
 document.addEventListener('click', e=>{
@@ -703,14 +714,17 @@ async function processFiles(){
     // === SINGLE PASS: empNameMap + salesBranchIdMap + dates + salesByBranch + salesByEmp + billToEmp ===
     const empNameMap={}, salesBranchIdMap={}, activeMths=new Set(), activeDates=new Set();
     const salesByBranch={}, salesByEmp={}, salesEmpBranch={}, billToEmp={};
+    const salesByBranchYm={}; // {branch:{ym:{mac,ipad,iphone,watch}}} for month filter
     sRows.forEach(r=>{
       const raw=s(r[kDate]);
+      let rowYm=null;
       if(raw){
         const m=raw.match(/(\d{2})\/(\d{2})\/(\d{4})/);
         if(m){
           const mn=parseInt(m[2]); if(mn>=1&&mn<=12)activeMths.add(mn);
           const ceY=parseInt(m[3])>2100?parseInt(m[3])-543:parseInt(m[3]);
           activeDates.add(`${m[1]}/${m[2]}/${ceY}`);
+          rowYm=`${ceY}-${String(mn).padStart(2,'0')}`;
         }
       }
       const oid=s(r[kOff]);
@@ -732,6 +746,12 @@ async function processFiles(){
       const dev=CAT_DEV[s(r[kCat])]; if(!dev)return;
       if(!salesByBranch[branch])salesByBranch[branch]={};
       salesByBranch[branch][dev]=(salesByBranch[branch][dev]||0)+qty;
+      // per-ym breakdown
+      if(rowYm){
+        if(!salesByBranchYm[branch])salesByBranchYm[branch]={};
+        if(!salesByBranchYm[branch][rowYm])salesByBranchYm[branch][rowYm]={mac:0,ipad:0,iphone:0,watch:0};
+        salesByBranchYm[branch][rowYm][dev]+=qty;
+      }
       if(!oid)return;
       if(!salesByEmp[oid])salesByEmp[oid]={};
       salesByEmp[oid][dev]=(salesByEmp[oid][dev]||0)+qty;
@@ -844,9 +864,58 @@ async function processFiles(){
     RAW_TRADE_ROWS = tRows;
     SALES_COL_KEYS = { kCat, kPType, kQty, kDate };
 
+    // === Build tradeByYm {branch:{ym:{agreed,evaluated}}} for month filter ===
+    const AGREED_ST_YM=new Set([5,7]);
+    const tradeByYm={};
+    if(tradeFormat==='search'){
+      // derive from raw transaction rows (all rows, no activeDates filter)
+      tRows.forEach(r=>{
+        let branch;
+        const rawCode=s(r['branch_code']||'');
+        const branchId=rawCode?String(parseInt(rawCode,10)||0):'';
+        if(branchId&&branchId!=='0'&&salesBranchIdMap[branchId]){
+          branch=salesBranchIdMap[branchId];
+        } else {
+          const rawBranch=s(r['ชื่อสาขา']||r['BRANCH_NAME']||'');
+          if(!rawBranch)return;
+          branch=matchBranch(rawBranch,salesKeys)||rawBranch;
+        }
+        const td=s(r['วันที่คำสั่งเทรด']||'');
+        const tm=td.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+        if(!tm)return;
+        const ceY=parseInt(tm[3])>2100?parseInt(tm[3])-543:parseInt(tm[3]);
+        const mn=parseInt(tm[2]); if(mn<1||mn>12)return;
+        const ym=`${ceY}-${String(mn).padStart(2,'0')}`;
+        if(!tradeByYm[branch])tradeByYm[branch]={};
+        if(!tradeByYm[branch][ym])tradeByYm[branch][ym]={agreed:0,evaluated:0};
+        tradeByYm[branch][ym].evaluated++;
+        if(AGREED_ST_YM.has(Number(r['BIDDING_STATUS'])||0))tradeByYm[branch][ym].agreed++;
+      });
+    } else {
+      // report format: use byMonth; infer year from salesByBranchYm keys
+      const ymKeys=Object.values(salesByBranchYm).flatMap(b=>Object.keys(b));
+      const inferYear=ymKeys.length?ymKeys.sort()[0].slice(0,4):String(new Date().getFullYear());
+      Object.entries(tradeSummary).forEach(([branch,v])=>{
+        Object.entries(v.byMonth||{}).forEach(([mn_str,bm])=>{
+          const mn=parseInt(mn_str); if(mn<1||mn>12)return;
+          const ym=`${inferYear}-${String(mn).padStart(2,'0')}`;
+          if(!tradeByYm[branch])tradeByYm[branch]={};
+          tradeByYm[branch][ym]={agreed:bm.agreed,evaluated:bm.evaluated};
+        });
+      });
+    }
+    // available_yms = sorted unique YYYY-MM strings across both trade and sales
+    const _allYMs=new Set();
+    Object.values(tradeByYm).forEach(byYm=>Object.keys(byYm).forEach(ym=>_allYMs.add(ym)));
+    Object.values(salesByBranchYm).forEach(byYm=>Object.keys(byYm).forEach(ym=>_allYMs.add(ym)));
+    const availableYMs=[..._allYMs].sort();
+
     DATA={
       sales_by_branch:salesByBranch,
+      sales_by_branch_ym:salesByBranchYm,
       trade_summary:tradeSummary,
+      trade_by_ym:tradeByYm,
+      available_yms:availableYMs,
       trade_format:tradeFormat,
       by_emp:byEmpTrade,
       sales_by_emp:salesByEmp,
@@ -873,6 +942,9 @@ function showDashboard(){
   document.querySelectorAll('.dev-chip').forEach(chip=>{
     chip.onclick=function(){ const cb=document.getElementById('dev-'+this.dataset.dev); cb.checked=!cb.checked; onDevChange(); };
   });
+  // Month/Year filter chips
+  SELECTED_YM = null;
+  renderYMFilter();
   // Period badge
   const badge=document.getElementById('period-badge');
   const lbl=document.getElementById('period-label');
@@ -994,7 +1066,7 @@ function resetAMRM(){
 
 function resetDashboard(){
   DATA=null; fileSales=[]; fileTrade=[]; fileASM=null; DATA_MONTHS='';
-  RAW_SALES_ROWS=[]; RAW_TRADE_ROWS=[]; SALES_COL_KEYS=null;
+  RAW_SALES_ROWS=[]; RAW_TRADE_ROWS=[]; SALES_COL_KEYS=null; SELECTED_YM=null;
   document.getElementById('dashboard-screen').classList.add('hidden');
   document.getElementById('upload-screen').classList.remove('hidden');
   document.getElementById('process-btn').classList.add('hidden');
@@ -1186,7 +1258,137 @@ function renderYearlyReport(){
           <td class="px-3 py-2 text-center"><span style="background:${attBg};color:${attColor};border:1px solid ${attBorder}" class="inline-block px-2 py-0.5 rounded-lg text-xs font-black">${totalAtt}%</span></td>
         </tr></tfoot>
       </table>
+    </div>
+    ${buildBranchYearChart()}`;
+}
+
+// ===== BRANCH × YEAR GROUPED BAR CHART =====
+let YEAR_CHART_AM = '';
+function buildBranchYearChart(){
+  if(!DATA||!DATA.trade_by_ym)return'';
+  const THAI_MTH=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  // Collect all CE years available in tradeByYm
+  const years=new Set();
+  Object.values(DATA.trade_by_ym).forEach(byYm=>Object.keys(byYm).forEach(ym=>years.add(ym.slice(0,4))));
+  if(years.size<2)return''; // only show if 2+ years
+  const sortedYears=[...years].sort();
+  const yr1=sortedYears[0], yr2=sortedYears[sortedYears.length-1];
+  const be1=(parseInt(yr1)+543).toString().slice(-2);
+  const be2=(parseInt(yr2)+543).toString().slice(-2);
+
+  // AM dropdown options (if has_amrm)
+  const amList=DATA.has_amrm?[...new Set(Object.values(DATA.branch_amrm).map(v=>v.am).filter(Boolean))].sort():[];
+  const amDropdown=amList.length?`<select id="year-chart-am" onchange="YEAR_CHART_AM=this.value;document.getElementById('year-chart-wrap').outerHTML=buildBranchYearChart()"
+    class="text-xs border border-gray-200 rounded-lg px-2 py-1 text-gray-600 bg-white focus:outline-none focus:border-[#1F3B2D]">
+    <option value="">ASM ทั้งหมด</option>
+    ${amList.map(a=>`<option value="${a}" ${YEAR_CHART_AM===a?'selected':''}>${a}</option>`).join('')}
+  </select>`:'';
+
+  // Collect branches to show (filter by AM if selected)
+  let branches=[...(DATA.all_branch_names||[])].filter(b=>b!=='Unknown').sort();
+  if(YEAR_CHART_AM&&DATA.has_amrm){
+    branches=branches.filter(b=>DATA.branch_amrm[b]?.am===YEAR_CHART_AM);
+  }
+
+  // Build per-branch per-year trade agreed totals
+  const branchData=branches.map(b=>{
+    const byYm=DATA.trade_by_ym[b]||{};
+    let a1=0,e1=0,a2=0,e2=0,s1=0,s2=0;
+    Object.entries(byYm).forEach(([ym,v])=>{
+      const y=ym.slice(0,4);
+      if(y===yr1){a1+=v.agreed;e1+=v.evaluated;}
+      else if(y===yr2){a2+=v.agreed;e2+=v.evaluated;}
+    });
+    // sales from salesByBranchYm
+    const sbYm=DATA.sales_by_branch_ym?.[b]||{};
+    const devs=getSelDevs();
+    Object.entries(sbYm).forEach(([ym,sb])=>{
+      const y=ym.slice(0,4);
+      const sold=devs.reduce((t,d)=>t+(sb[d]||0),0);
+      if(y===yr1)s1+=sold;
+      else if(y===yr2)s2+=sold;
+    });
+    const att1=s1>0?Math.round(a1/s1*100):0;
+    const att2=s2>0?Math.round(a2/s2*100):0;
+    return{b,a1,e1,s1,att1,a2,e2,s2,att2};
+  }).filter(r=>r.a1>0||r.a2>0);
+
+  if(!branchData.length)return`<div id="year-chart-wrap" class="bg-white rounded-xl shadow-card p-6 mt-4 text-center text-gray-400 text-sm">ไม่พบข้อมูลที่เปรียบเทียบได้ระหว่างปี ${yr1} และ ${yr2}</div>`;
+
+  // Sort by max ATT% desc
+  branchData.sort((a,b)=>Math.max(b.att1,b.att2)-Math.max(a.att1,a.att2)||b.a2-a.a2);
+
+  const COL1='#6366f1'; // indigo — year 1
+  const COL2='#f59e0b'; // amber — year 2
+  const maxAgreed=Math.max(...branchData.map(r=>Math.max(r.a1,r.a2)),1);
+
+  const bars=branchData.map(r=>{
+    const h1=Math.max(Math.round(r.a1/maxAgreed*80),r.a1>0?3:0);
+    const h2=Math.max(Math.round(r.a2/maxAgreed*80),r.a2>0?3:0);
+    const c1=r.att1>=35?'#22c55e':r.att1>0?'#ef4444':'#d1d5db';
+    const c2=r.att2>=35?'#22c55e':r.att2>0?'#ef4444':'#d1d5db';
+    const bn=r.b.length>10?r.b.slice(0,10)+'…':r.b;
+    return`<div style="display:flex;flex-direction:column;align-items:center;gap:2px;min-width:36px;flex:0 0 auto">
+      <div style="display:flex;flex-direction:column;align-items:center;font-size:9px;font-weight:700;color:${c2}">${r.att2>0?r.att2+'%':''}</div>
+      <div style="display:flex;gap:2px;align-items:flex-end;height:84px">
+        <div style="width:12px;background:${COL1};height:${h1}%;min-height:${r.a1>0?3:0}px;border-radius:2px 2px 0 0;opacity:0.85" title="${yr1} ตกลง:${r.a1} ประเมิน:${r.e1}"></div>
+        <div style="width:12px;background:${COL2};height:${h2}%;min-height:${r.a2>0?3:0}px;border-radius:2px 2px 0 0" title="${yr2} ตกลง:${r.a2} ประเมิน:${r.e2}"></div>
+      </div>
+      <div style="font-size:8px;color:#9ca3af;text-align:center;max-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.b}">${bn}</div>
     </div>`;
+  }).join('');
+
+  // Summary table
+  const tableRows=branchData.map((r,i)=>{
+    const diff=r.att2-r.att1;
+    const diffTxt=diff>0?`<span class="text-emerald-500 font-bold">▲${diff}%</span>`:diff<0?`<span class="text-red-400 font-bold">▼${Math.abs(diff)}%</span>`:`<span class="text-gray-400">–</span>`;
+    const a1c=r.att1>=35?'#22c55e':r.att1>0?'#ef4444':'#9ca3af';
+    const a2c=r.att2>=35?'#22c55e':r.att2>0?'#ef4444':'#9ca3af';
+    return`<tr class="border-b border-gray-100 hover:bg-gray-50 text-xs">
+      <td class="px-2 py-1.5 text-center text-gray-400">${i+1}</td>
+      <td class="px-2 py-1.5 font-medium text-gray-700 max-w-[110px] truncate" title="${r.b}">${r.b}</td>
+      <td class="px-2 py-1.5 text-center font-bold" style="color:${a1c}">${r.att1}%</td>
+      <td class="px-2 py-1.5 text-center text-gray-400">${r.a1}/${r.s1}</td>
+      <td class="px-2 py-1.5 text-center font-bold" style="color:${a2c}">${r.att2}%</td>
+      <td class="px-2 py-1.5 text-center text-gray-400">${r.a2}/${r.s2}</td>
+      <td class="px-2 py-1.5 text-center">${diffTxt}</td>
+    </tr>`;
+  }).join('');
+
+  return`<div id="year-chart-wrap" class="bg-white rounded-xl shadow-card p-4 mt-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <div>
+        <div class="text-sm font-bold text-gray-700">📊 เปรียบเทียบรายสาขา ปี ${yr1+543} vs ${yr2+543}</div>
+        <div class="text-xs text-gray-400">จากข้อมูลในไฟล์ trade_search ทั้งหมด (ไม่กรองตามเดือน)</div>
+      </div>
+      <div class="flex items-center gap-3 flex-wrap">
+        <div class="flex items-center gap-4 text-xs text-gray-400">
+          <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;background:${COL1};border-radius:2px"></span>ปี ${yr1+543}</span>
+          <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;background:${COL2};border-radius:2px"></span>ปี ${yr2+543}</span>
+        </div>
+        ${amDropdown}
+      </div>
+    </div>
+    <div style="overflow-x:auto;padding-bottom:4px">
+      <div style="display:flex;align-items:flex-end;gap:4px;min-height:110px;padding-bottom:2px;min-width:max-content">
+        ${bars}
+      </div>
+    </div>
+    <div class="mt-4 overflow-x-auto">
+      <table class="w-full min-w-[480px]">
+        <thead><tr class="bg-gray-50 text-[10px] text-gray-500 uppercase">
+          <th class="px-2 py-1.5 w-8">#</th>
+          <th class="px-2 py-1.5 text-left">สาขา</th>
+          <th class="px-2 py-1.5 text-center" style="color:${COL1}">ATT% ${yr1+543}</th>
+          <th class="px-2 py-1.5 text-center text-gray-400">ตกลง/ขาย ${yr1+543}</th>
+          <th class="px-2 py-1.5 text-center" style="color:${COL2}">ATT% ${yr2+543}</th>
+          <th class="px-2 py-1.5 text-center text-gray-400">ตกลง/ขาย ${yr2+543}</th>
+          <th class="px-2 py-1.5 text-center">เปลี่ยนแปลง</th>
+        </tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
+  </div>`;
 }
 
 // ===== BRANCH CHECKBOX DROPDOWN =====
@@ -1686,13 +1888,62 @@ function attStyle(p){
   return        {hex:'#dc2626',bg:'bg-red-400',     label:'text-red-500'};
 }
 function getSelDevs(){ return DEV_KEYS.filter(d=>document.getElementById('dev-'+d)?.checked); }
-function sumSales(b,devs){ const sb=DATA.sales_by_branch[b]||{}; return devs.reduce((s,d)=>s+(sb[d]||0),0); }
+function sumSales(b,devs){
+  const sb=SELECTED_YM
+    ?(DATA.sales_by_branch_ym?.[b]?.[SELECTED_YM]||{})
+    :(DATA.sales_by_branch[b]||{});
+  return devs.reduce((s,d)=>s+(sb[d]||0),0);
+}
 function sumEmpSales(empId,devs){ const se=DATA.sales_by_emp[String(empId)]||{}; return devs.reduce((s,d)=>s+(se[d]||0),0); }
 function sumAllTrades(b){
+  if(SELECTED_YM){
+    const ym=DATA.trade_by_ym?.[b]?.[SELECTED_YM]||{evaluated:0,agreed:0};
+    return{evaluated:ym.evaluated,agreed:ym.agreed,not_agreed:ym.evaluated-ym.agreed,cancelled:0,waiting:0};
+  }
   const t=DATA.trade_summary[b]||{evaluated:0,agreed:0,not_agreed:0};
   return{evaluated:t.evaluated,agreed:t.agreed,not_agreed:t.not_agreed,cancelled:0,waiting:0};
 }
 function sumTrades(b,devs){ return sumAllTrades(b); }
+
+// ===== MONTH / YEAR FILTER =====
+function getYMLabel(ym){
+  const THAI_MTH=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const [y,mo]=ym.split('-');
+  const beY=(parseInt(y)+543).toString().slice(-2);
+  return `${THAI_MTH[parseInt(mo)]} ${beY}`;
+}
+function renderYMFilter(){
+  const bar=document.getElementById('ym-filter-bar');
+  const chips=document.getElementById('ym-chips');
+  if(!bar||!chips||!DATA)return;
+  const yms=DATA.available_yms||[];
+  if(yms.length<=1){ bar.classList.add('hidden'); return; }
+  bar.classList.remove('hidden');
+  chips.innerHTML=yms.map(ym=>{
+    const active=SELECTED_YM===ym;
+    const base='cursor-pointer text-xs font-bold px-3 py-1 rounded-full border transition-all';
+    const cls=active
+      ?`${base} bg-[#1F3B2D] text-white border-[#1F3B2D]`
+      :`${base} bg-gray-50 text-gray-500 border-gray-200 hover:border-[#1F3B2D] hover:text-[#1F3B2D]`;
+    return `<button class="${cls}" onclick="onYMChange('${ym}')">${getYMLabel(ym)}</button>`;
+  }).join('');
+  const resetBtn=document.getElementById('ym-reset-btn');
+  if(resetBtn) resetBtn.classList.toggle('text-[#1F3B2D]',!!SELECTED_YM);
+}
+function onYMChange(ym){
+  SELECTED_YM = SELECTED_YM===ym ? null : ym;
+  renderYMFilter();
+  render();
+  if(currentView==='emp'&&DATA) renderEmpSummary(getSelDevs(), getAMRMBranches());
+  if(currentView==='rmam'&&DATA) renderRMAM();
+}
+function resetYMFilter(){
+  SELECTED_YM=null;
+  renderYMFilter();
+  render();
+  if(currentView==='emp'&&DATA) renderEmpSummary(getSelDevs(), getAMRMBranches());
+  if(currentView==='rmam'&&DATA) renderRMAM();
+}
 
 function updateChips(){
   document.querySelectorAll('.dev-chip').forEach(chip=>{
