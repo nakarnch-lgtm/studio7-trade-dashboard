@@ -219,13 +219,24 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
       </button>
     </div>
 
-    <!-- MONTH / YEAR FILTER (global — applies to all tabs) -->
-    <div id="ym-filter-bar" class="hidden bg-white rounded-xl shadow-card px-4 py-2.5 mb-3">
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="text-xs font-bold text-gray-500 uppercase tracking-wider shrink-0">📅 เดือน:</span>
-        <div class="flex flex-wrap gap-1.5" id="ym-chips"></div>
-        <button onclick="resetYMFilter()" id="ym-reset-btn"
-          class="text-xs text-gray-400 hover:text-gray-600 underline ml-auto shrink-0">ทั้งหมด</button>
+    <!-- DATE RANGE FILTER (global — applies to all tabs) -->
+    <div id="date-range-bar" class="hidden bg-white rounded-xl shadow-card px-4 py-2.5 mb-3">
+      <div class="flex flex-wrap items-center gap-3">
+        <span class="text-xs font-bold text-gray-500 uppercase tracking-wider shrink-0">📅 ช่วงวันที่:</span>
+        <div class="flex items-center gap-1.5">
+          <label class="text-xs font-semibold text-gray-500">ตั้งแต่วันที่</label>
+          <input type="date" id="date-start"
+            class="text-xs border border-gray-200 rounded-lg px-2 py-1 font-semibold text-gray-700 focus:outline-none focus:border-[#1F3B2D]"
+            onchange="onDateRangeChange()">
+        </div>
+        <div class="flex items-center gap-1.5">
+          <label class="text-xs font-semibold text-gray-500">ถึงวันที่</label>
+          <input type="date" id="date-end"
+            class="text-xs border border-gray-200 rounded-lg px-2 py-1 font-semibold text-gray-700 focus:outline-none focus:border-[#1F3B2D]"
+            onchange="onDateRangeChange()">
+        </div>
+        <button onclick="resetDateRange()"
+          class="text-xs text-gray-400 hover:text-[#1F3B2D] underline ml-auto shrink-0">รีเซ็ต</button>
       </div>
     </div>
 
@@ -442,7 +453,8 @@ let DATA = null, fileSales = [], fileTrade = [], fileASM = null, DATA_MONTHS = '
 let RAW_SALES_ROWS = [], RAW_TRADE_ROWS = [], SALES_COL_KEYS = null;
 let DRILL_BRANCH = null;
 let SELECTED_BRANCHES = new Set(); // empty = all; หรือ Set ของ branch ที่เลือก
-let SELECTED_YM = null;           // "YYYY-MM" หรือ null = ทั้งหมด
+let DATE_RANGE_START = null;      // "YYYY-MM-DD" หรือ null = ไม่ filter
+let DATE_RANGE_END = null;        // "YYYY-MM-DD" หรือ null = ไม่ filter
 
 // ปิด branch dropdown เมื่อคลิกนอก
 document.addEventListener('click', e=>{
@@ -955,9 +967,9 @@ function showDashboard(){
   document.querySelectorAll('.dev-chip').forEach(chip=>{
     chip.onclick=function(){ const cb=document.getElementById('dev-'+this.dataset.dev); cb.checked=!cb.checked; onDevChange(); };
   });
-  // Month/Year filter chips
-  SELECTED_YM = null;
-  renderYMFilter();
+  // Date range filter — default to full latest month in data
+  resetDateRange();
+  showDateRangeBar();
   // Period badge
   const badge=document.getElementById('period-badge');
   const lbl=document.getElementById('period-label');
@@ -1079,7 +1091,8 @@ function resetAMRM(){
 
 function resetDashboard(){
   DATA=null; fileSales=[]; fileTrade=[]; fileASM=null; DATA_MONTHS='';
-  RAW_SALES_ROWS=[]; RAW_TRADE_ROWS=[]; SALES_COL_KEYS=null; SELECTED_YM=null;
+  RAW_SALES_ROWS=[]; RAW_TRADE_ROWS=[]; SALES_COL_KEYS=null;
+  DATE_RANGE_START=null; DATE_RANGE_END=null;
   document.getElementById('dashboard-screen').classList.add('hidden');
   document.getElementById('upload-screen').classList.remove('hidden');
   document.getElementById('process-btn').classList.add('hidden');
@@ -1901,61 +1914,85 @@ function attStyle(p){
   return        {hex:'#dc2626',bg:'bg-red-400',     label:'text-red-500'};
 }
 function getSelDevs(){ return DEV_KEYS.filter(d=>document.getElementById('dev-'+d)?.checked); }
+function getActiveYMs(){
+  const yms=DATA?.available_yms||[];
+  if(!DATE_RANGE_START&&!DATE_RANGE_END)return yms;
+  return yms.filter(ym=>{
+    const[y,m]=ym.split('-').map(Number);
+    const ymStart=`${y}-${String(m).padStart(2,'0')}-01`;
+    const lastDay=new Date(y,m,0).getDate();
+    const ymEnd=`${y}-${String(m).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+    const s=DATE_RANGE_START||'0000-01-01';
+    const e=DATE_RANGE_END||'9999-12-31';
+    return ymEnd>=s&&ymStart<=e;
+  });
+}
 function sumSales(b,devs){
-  const sb=SELECTED_YM
-    ?(DATA.sales_by_branch_ym?.[b]?.[SELECTED_YM]||{})
-    :(DATA.sales_by_branch[b]||{});
-  return devs.reduce((s,d)=>s+(sb[d]||0),0);
+  const active=getActiveYMs();
+  const all=DATA?.available_yms||[];
+  if(!DATE_RANGE_START&&!DATE_RANGE_END&&active.length===all.length){
+    const sb=DATA.sales_by_branch[b]||{};
+    return devs.reduce((s,d)=>s+(sb[d]||0),0);
+  }
+  return devs.reduce((s,d)=>s+active.reduce((sum,ym)=>sum+(DATA.sales_by_branch_ym?.[b]?.[ym]?.[d]||0),0),0);
 }
 function sumEmpSales(empId,devs){ const se=DATA.sales_by_emp[String(empId)]||{}; return devs.reduce((s,d)=>s+(se[d]||0),0); }
 function sumAllTrades(b){
-  if(SELECTED_YM){
-    const ym=DATA.trade_by_ym?.[b]?.[SELECTED_YM]||{evaluated:0,agreed:0};
-    return{evaluated:ym.evaluated,agreed:ym.agreed,not_agreed:ym.evaluated-ym.agreed,cancelled:0,waiting:0};
+  const active=getActiveYMs();
+  const all=DATA?.available_yms||[];
+  if(!DATE_RANGE_START&&!DATE_RANGE_END&&active.length===all.length){
+    const t=DATA.trade_summary[b]||{evaluated:0,agreed:0,not_agreed:0};
+    return{evaluated:t.evaluated,agreed:t.agreed,not_agreed:t.not_agreed,cancelled:0,waiting:0};
   }
-  const t=DATA.trade_summary[b]||{evaluated:0,agreed:0,not_agreed:0};
-  return{evaluated:t.evaluated,agreed:t.agreed,not_agreed:t.not_agreed,cancelled:0,waiting:0};
+  let evaluated=0,agreed=0;
+  active.forEach(ym=>{
+    const yd=DATA.trade_by_ym?.[b]?.[ym]||{evaluated:0,agreed:0};
+    evaluated+=yd.evaluated; agreed+=yd.agreed;
+  });
+  return{evaluated,agreed,not_agreed:evaluated-agreed,cancelled:0,waiting:0};
 }
 function sumTrades(b,devs){ return sumAllTrades(b); }
 
-// ===== MONTH / YEAR FILTER =====
-function getYMLabel(ym){
-  const THAI_MTH=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-  const [y,mo]=ym.split('-');
-  const beY=(parseInt(y)+543).toString().slice(-2);
-  return `${THAI_MTH[parseInt(mo)]} ${beY}`;
-}
-function renderYMFilter(){
-  const bar=document.getElementById('ym-filter-bar');
-  const chips=document.getElementById('ym-chips');
-  if(!bar||!chips||!DATA)return;
+// ===== DATE RANGE FILTER =====
+function showDateRangeBar(){
+  const bar=document.getElementById('date-range-bar');
+  if(!bar||!DATA)return;
   const yms=DATA.available_yms||[];
-  if(yms.length<=1){ bar.classList.add('hidden'); return; }
+  if(yms.length===0){ bar.classList.add('hidden'); return; }
   bar.classList.remove('hidden');
-  chips.innerHTML=yms.map(ym=>{
-    const active=SELECTED_YM===ym;
-    const base='cursor-pointer text-xs font-bold px-3 py-1 rounded-full border transition-all';
-    const cls=active
-      ?`${base} bg-[#1F3B2D] text-white border-[#1F3B2D]`
-      :`${base} bg-gray-50 text-gray-500 border-gray-200 hover:border-[#1F3B2D] hover:text-[#1F3B2D]`;
-    return `<button class="${cls}" onclick="onYMChange('${ym}')">${getYMLabel(ym)}</button>`;
-  }).join('');
-  const resetBtn=document.getElementById('ym-reset-btn');
-  if(resetBtn) resetBtn.classList.toggle('text-[#1F3B2D]',!!SELECTED_YM);
 }
-function onYMChange(ym){
-  SELECTED_YM = SELECTED_YM===ym ? null : ym;
-  renderYMFilter();
+function onDateRangeChange(){
+  DATE_RANGE_START=document.getElementById('date-start')?.value||null;
+  DATE_RANGE_END=document.getElementById('date-end')?.value||null;
+  if(DATE_RANGE_START&&DATE_RANGE_END&&DATE_RANGE_START>DATE_RANGE_END){
+    DATE_RANGE_END=DATE_RANGE_START;
+    const el=document.getElementById('date-end');
+    if(el) el.value=DATE_RANGE_END;
+  }
   render();
   if(currentView==='emp'&&DATA) renderEmpSummary(getSelDevs(), getAMRMBranches());
   if(currentView==='rmam'&&DATA) renderRMAM();
 }
-function resetYMFilter(){
-  SELECTED_YM=null;
-  renderYMFilter();
-  render();
-  if(currentView==='emp'&&DATA) renderEmpSummary(getSelDevs(), getAMRMBranches());
-  if(currentView==='rmam'&&DATA) renderRMAM();
+function resetDateRange(){
+  const yms=DATA?.available_yms||[];
+  if(yms.length>0){
+    const latest=yms[yms.length-1];
+    const[y,m]=latest.split('-').map(Number);
+    DATE_RANGE_START=`${y}-${String(m).padStart(2,'0')}-01`;
+    const lastDay=new Date(y,m,0).getDate();
+    DATE_RANGE_END=`${y}-${String(m).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+  } else {
+    DATE_RANGE_START=null; DATE_RANGE_END=null;
+  }
+  const s=document.getElementById('date-start');
+  const e=document.getElementById('date-end');
+  if(s) s.value=DATE_RANGE_START||'';
+  if(e) e.value=DATE_RANGE_END||'';
+  if(DATA){
+    render();
+    if(currentView==='emp') renderEmpSummary(getSelDevs(), getAMRMBranches());
+    if(currentView==='rmam') renderRMAM();
+  }
 }
 
 function updateChips(){
