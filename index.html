@@ -284,12 +284,12 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
           <thead>
             <tr class="bg-[#1F3B2D] text-white">
               <th class="px-1 py-2.5 text-center text-xs font-bold uppercase tracking-wide w-7">#</th>
-              <th class="px-2 py-2.5 text-left text-sm font-bold uppercase tracking-wide">สาขา</th>
-              <th class="px-1 py-2.5 text-center text-xs font-bold uppercase w-11">ตกลง</th>
-              <th class="px-1 py-2.5 text-center text-xs font-bold uppercase w-[66px]">ยอดประเมิน</th>
-              <th class="px-1 py-2.5 text-center text-xs font-bold uppercase w-11">ขาย</th>
-              <th class="px-1 py-2.5 text-center text-xs font-bold uppercase w-[108px]">ATT%</th>
-              <th class="px-2 py-2.5 text-left text-xs font-bold uppercase w-28 hidden md:table-cell">Device (ขาย)</th>
+              <th class="px-2 py-2.5 text-left text-sm font-bold uppercase tracking-wide w-[42%]">สาขา</th>
+              <th class="px-1 py-2.5 text-center text-xs font-bold uppercase w-24">ตกลง</th>
+              <th class="px-1 py-2.5 text-center text-xs font-bold uppercase w-24">ยอดประเมิน</th>
+              <th class="px-1 py-2.5 text-center text-xs font-bold uppercase w-24">ขาย</th>
+              <th class="px-1 py-2.5 text-center text-xs font-bold uppercase w-[120px]">ATT%</th>
+              <th class="px-2 py-2.5 text-center text-xs font-bold uppercase w-24 hidden md:table-cell">Device (ขาย)</th>
             </tr>
           </thead>
           <tbody id="summary-tbody"></tbody>
@@ -297,7 +297,7 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
       </div>
       <div class="mt-2 flex items-center gap-2 text-xs text-gray-400">
         <div class="w-3 h-3 rounded-sm bg-red-100 border border-red-300"></div>
-        <span>ATT% ต่ำกว่า 15% — ต้องพัฒนา</span>
+        <span>ATT% ต่ำกว่า 35% — ต้องพัฒนา</span>
       </div>
     </div>
 
@@ -311,7 +311,7 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
       <div class="bg-white rounded-xl shadow-card overflow-x-auto" id="emp-table-wrap"></div>
       <div class="mt-2 flex items-center gap-2 text-xs text-gray-400">
         <div class="w-3 h-3 rounded-sm bg-red-100 border border-red-300"></div>
-        <span>ATT% ต่ำกว่า 15% — ต้องพัฒนา</span>
+        <span>ATT% ต่ำกว่า 35% — ต้องพัฒนา</span>
       </div>
     </div>
 
@@ -461,35 +461,51 @@ function readXlsx(file){
 function findCol(sample, candidates){ for(const c of candidates){ if(c in sample) return c; } return candidates[0]; }
 function s(v){ return v!=null?String(v):''; }
 function shortBranch(b){ if(!b)return'Unknown'; return b.includes(': ')?b.split(': ').slice(1).join(': '):b.includes(':')?b.split(':').slice(1).join(':').trim():b; }
+const _normCache=new Map();
 function normBranch(b){
-  return b.toLowerCase()
-    .replace(/studio\s*7/g,'studio7')   // Studio7 / Studio 7 → studio7
-    .replace(/\bbig\s*-?\s*c\b/g,'bigc') // Big C / Big-C → bigc
-    .replace(/\bbic\s+c\b/g,'bigc')      // Bic C (typo) → bigc
+  if(_normCache.has(b)) return _normCache.get(b);
+  const r=b.toLowerCase()
+    .replace(/studio\s*7/g,'studio7')
+    .replace(/\bbig\s*-?\s*c\b/g,'bigc')
+    .replace(/\bbic\s+c\b/g,'bigc')
     .replace(/b-play/g,'bplay')
     .replace(/\(ustore\)/gi,' ustore ')
-    .replace(/\([^)]*\)/g,' ')           // strip remaining (parenthetical)
+    .replace(/\([^)]*\)/g,' ')
     .replace(/[^a-z0-9ก-๙]/g,' ')
     .replace(/\s+/g,' ').trim();
+  _normCache.set(b,r);
+  return r;
 }
+let _branchLookup=null, _branchLookupKeys=null;
+function buildBranchLookup(salesKeys){
+  const exact=new Map();
+  const entries=salesKeys.map(k=>{
+    const norm=normBranch(k);
+    const words=new Set(norm.split(' ').filter(w=>w.length>2));
+    exact.set(norm,k);
+    return{key:k,norm,words};
+  });
+  _branchLookup={exact,entries};
+  _branchLookupKeys=salesKeys;
+}
+const _matchCache=new Map();
 function matchBranch(reportName, salesKeys){
+  if(salesKeys!==_branchLookupKeys) buildBranchLookup(salesKeys);
+  if(_matchCache.has(reportName)) return _matchCache.get(reportName);
   const rn=normBranch(reportName);
-  // exact match first
-  for(const k of salesKeys){ if(normBranch(k)===rn)return k; }
-  // contains match
-  for(const k of salesKeys){ const kn=normBranch(k); if(rn.includes(kn)||kn.includes(rn))return k; }
-  // word-overlap fuzzy match (≥3 meaningful words in common, and overlap≥60%)
+  const lk=_branchLookup;
+  if(lk.exact.has(rn)){ const r=lk.exact.get(rn); _matchCache.set(reportName,r); return r; }
+  for(const e of lk.entries){ if(rn.includes(e.norm)||e.norm.includes(rn)){ _matchCache.set(reportName,e.key); return e.key; } }
   const rw=new Set(rn.split(' ').filter(w=>w.length>2));
   let bestK=null, bestScore=0;
-  for(const k of salesKeys){
-    const kn=normBranch(k);
-    const kw=kn.split(' ').filter(w=>w.length>2);
-    const common=kw.filter(w=>rw.has(w)).length;
-    const shorter=Math.min(rw.size,kw.length);
-    if(common>=3 && common/shorter>=0.6 && common>bestScore){ bestScore=common; bestK=k; }
+  for(const e of lk.entries){
+    const common=[...e.words].filter(w=>rw.has(w)).length;
+    const shorter=Math.min(rw.size,e.words.size);
+    if(common>=3&&common/shorter>=0.6&&common>bestScore){ bestScore=common; bestK=e.key; }
   }
-  if(bestK) return bestK;
-  return reportName; // fallback — use as-is
+  const result=bestK||reportName;
+  _matchCache.set(reportName,result);
+  return result;
 }
 function parseTradeReport(rows){
   const COL0=Object.keys(rows[0])[0];
@@ -638,11 +654,14 @@ async function processFiles(){
   errEl.classList.add('hidden');
   document.getElementById('process-btn').classList.add('hidden');
   document.getElementById('loading').classList.remove('hidden');
+  _normCache.clear(); _matchCache.clear(); _branchLookup=null; _branchLookupKeys=null;
   try{
-    document.getElementById('loading-msg').textContent='กำลังอ่านไฟล์ยอดขาย…';
-    const sRows=await readXlsx(fileSales);
-    document.getElementById('loading-msg').textContent='กำลังอ่านรายงานเทรด…';
-    const tRows=await readXlsx(fileTrade);
+    document.getElementById('loading-msg').textContent='กำลังอ่านไฟล์ทั้งหมด…';
+    const [sRows, tRows, asmRows] = await Promise.all([
+      readXlsx(fileSales),
+      readXlsx(fileTrade),
+      fileASM ? readXlsx(fileASM) : Promise.resolve(null)
+    ]);
     document.getElementById('loading-msg').textContent='กำลังประมวลผลข้อมูล…';
 
     const sS=sRows[0]||{};
@@ -654,13 +673,12 @@ async function processFiles(){
     const kOff    =findCol(sS,['Officer (ID)','OfficerID']);
     const kOffName=findCol(sS,['Officer (Name)','OfficerName','Officer Name']);
     const kDate   =findCol(sS,['Doc Date','DocDate','Date','วันที่']);
-    // คอลัม Q (index 16) ในไฟล์ยอดขาย = เลขที่บิล สำหรับ lookup ข้ามไฟล์เทรด
     const sBillCol=Object.keys(sS)[16]??null;
 
-    // === PASS 1: empNameMap + salesBranchIdMap + activeMths + activeDates (single loop) ===
+    // === SINGLE PASS: empNameMap + salesBranchIdMap + dates + salesByBranch + salesByEmp + billToEmp ===
     const empNameMap={}, salesBranchIdMap={}, activeMths=new Set(), activeDates=new Set();
+    const salesByBranch={}, salesByEmp={}, salesEmpBranch={}, billToEmp={};
     sRows.forEach(r=>{
-      // วันที่ → เดือน + วันที่ CE สำหรับ filter
       const raw=s(r[kDate]);
       if(raw){
         const m=raw.match(/(\d{2})\/(\d{2})\/(\d{4})/);
@@ -670,32 +688,21 @@ async function processFiles(){
           activeDates.add(`${m[1]}/${m[2]}/${ceY}`);
         }
       }
-      // empNameMap
       const oid=s(r[kOff]);
       if(oid){ const nm=s(r[kOffName]); if(nm&&!empNameMap[oid])empNameMap[oid]=nm; }
-      // salesBranchIdMap จากทุก row — ให้สาขาที่ไม่มี Device sales ยังถูก map ได้
-      // (Inventory Item ใส่ก่อน เพราะมีชื่อสาขาที่ canonical กว่า)
       const _bid=String(Number(s(r[kBranchId]))||0);
       if(_bid&&_bid!=='0'&&!salesBranchIdMap[_bid]){
         const _bn=shortBranch(s(r[kBranch]));
         if(_bn&&_bn!=='Unknown')salesBranchIdMap[_bid]=_bn;
       }
-    });
-
-    // === PASS 2: salesByBranch + salesByEmp + salesEmpBranch + billToEmp (single loop) ===
-    const salesByBranch={}, salesByEmp={}, salesEmpBranch={}, billToEmp={};
-    sRows.forEach(r=>{
       if(r[kPType]!=='Inventory Item')return;
-      const bid=String(Number(s(r[kBranchId]))||0);
+      const bid=_bid;
       const branch=(bid&&bid!=='0'&&salesBranchIdMap[bid])?salesBranchIdMap[bid]:shortBranch(s(r[kBranch]));
-      const oid=s(r[kOff]);
-      // billToEmp lookup
       if(sBillCol&&oid){
         const bill=s(r[sBillCol]);
         if(bill&&!billToEmp[bill])
           billToEmp[bill]={empId:oid,name:empNameMap[oid]||s(r[kOffName]||''),branch};
       }
-      // ยอดขาย device
       const qty=Number(r[kQty])||0; if(qty<=0)return;
       const dev=CAT_DEV[s(r[kCat])]; if(!dev)return;
       if(!salesByBranch[branch])salesByBranch[branch]={};
@@ -780,9 +787,7 @@ async function processFiles(){
 
     // Parse ASM mapping file if provided (optional ไฟล์ 3)
     let branchAMRM={}, hasAMRM=false;
-    if(fileASM){
-      document.getElementById('loading-msg').textContent='กำลังอ่านข้อมูล ASM/RSM…';
-      const asmRows=await readXlsx(fileASM);
+    if(asmRows){
       branchAMRM=parseASMFile(asmRows, salesKeys, salesBranchIdMap, salesFileIds);
       hasAMRM=Object.keys(branchAMRM).length>0;
     }
@@ -1070,7 +1075,7 @@ function drillDown(branch){
   const{agreed,evaluated:trTotal}=sumAllTrades(branch);
   const attP=pct(agreed,salesTotal);
   const bn=branch==='Unknown'?'ไม่ระบุสาขา':branch;
-  const headerBg=attP<15?'#CA3433':'#50C878';
+  const headerBg=attP<35?'#CA3433':'#50C878';
 
   document.getElementById('drill-branch-title').textContent=bn;
   const attEl=document.getElementById('drill-branch-att');
@@ -1132,7 +1137,7 @@ function renderSummary(sorted, devs){
     const salesTotal = sumSales(branch, devs);
     const{agreed, evaluated:trTotal} = sumAllTrades(branch);
     const bn = branch==='Unknown'?'ไม่ระบุสาขา':branch;
-    const danger = attP < 15;
+    const danger = attP < 35;
     const rowBg  = danger ? 'bg-red-50 hover:bg-red-100' : (i%2===0?'bg-white hover:bg-gray-50':'bg-gray-50/60 hover:bg-gray-100');
     const attColor = danger ? 'text-red-600 font-black' : (attP>=60?'text-emerald-600 font-black':'text-amber-600 font-black');
     const barColor = danger ? 'bg-red-400' : (attP>=60?'bg-emerald-500':attP>=40?'bg-amber-400':'bg-orange-400');
@@ -1154,7 +1159,7 @@ function renderSummary(sorted, devs){
       <td class="px-2 py-2 overflow-hidden">
         <div class="flex items-center gap-1.5 min-w-0">
           <span class="font-bold text-gray-800 text-sm leading-tight truncate" title="${bn}">${bn}</span>
-          ${danger?'<span class="shrink-0 text-xs text-red-500 font-bold leading-none whitespace-nowrap">⚠ &lt;15%</span>':''}
+          ${danger?'<span class="shrink-0 text-xs text-red-500 font-bold leading-none whitespace-nowrap">⚠ &lt;35%</span>':''}
         </div>
       </td>
       <td class="px-1 py-2 text-center text-base font-black text-emerald-600">${agreed}</td>
@@ -1168,7 +1173,7 @@ function renderSummary(sorted, devs){
           <span class="w-10 text-right text-sm font-black ${attColor}">${attP}%</span>
         </div>
       </td>
-      <td class="px-2 py-2 hidden md:table-cell">${devMini}</td>
+      <td class="px-2 py-2 hidden md:table-cell"><div class="flex justify-center">${devMini}</div></td>
     </tr>`;
   }).join('');
 }
@@ -1217,7 +1222,7 @@ function renderEmpPage(page){
 
   const rows=pageItems.map((e,pi)=>{
     const i=start+pi; // global rank index
-    const danger=e.attP<15&&e.devSold>0;
+    const danger=e.attP<35&&e.devSold>0;
     const rowBg=danger?'bg-red-50 hover:bg-red-100':(pi%2===0?'bg-white hover:bg-gray-50':'bg-gray-50/60 hover:bg-gray-100');
     const attColor=danger?'text-red-600 font-black':(e.attP>=60?'text-emerald-600 font-black':'text-amber-600 font-black');
     const barColor=danger?'bg-red-400':(e.attP>=60?'bg-emerald-500':e.attP>=40?'bg-amber-400':'bg-orange-400');
@@ -1233,7 +1238,7 @@ function renderEmpPage(page){
       <td class="px-2 py-2 overflow-hidden max-w-[140px]">
         <div class="flex items-center gap-1.5 min-w-0">
           <span class="font-bold text-gray-800 text-sm leading-tight truncate" title="${e.name}">${e.name}</span>
-          ${danger?'<span class="shrink-0 text-xs text-red-500 font-bold leading-none whitespace-nowrap">⚠ &lt;15%</span>':''}
+          ${danger?'<span class="shrink-0 text-xs text-red-500 font-bold leading-none whitespace-nowrap">⚠ &lt;35%</span>':''}
         </div>
       </td>
       <td class="px-2 py-2 hidden md:table-cell max-w-[160px]">
@@ -1366,7 +1371,7 @@ function renderRMAM(){
 
   wrap.innerHTML=natBadge+rmData.map((r,ri)=>{
     const rmStyle=attStyle(r.att);
-    const rmBg=r.att<15?'#CA3433':'#1F3B2D';
+    const rmBg=r.att<35?'#CA3433':'#1F3B2D';
     const diffNat=r.att-natATT;
     const diffLabel=diffNat>0?`<span class="text-emerald-400 text-xs font-bold ml-1">+${diffNat}%</span>`
                     :diffNat<0?`<span class="text-red-300 text-xs font-bold ml-1">${diffNat}%</span>`
@@ -1374,7 +1379,7 @@ function renderRMAM(){
 
     const amCards=r.ams.map((a,ai)=>{
       const aStyle=attStyle(a.att);
-      const aBg=a.att<15?'bg-red-50 border-red-200':'bg-white border-gray-100';
+      const aBg=a.att<35?'bg-red-50 border-red-200':'bg-white border-gray-100';
       const aDiffNat=a.att-natATT;
       const aDiffLabel=aDiffNat>0?`<span class="text-emerald-600 text-[10px] font-bold">▲ ${aDiffNat}% vs BU</span>`
                       :aDiffNat<0?`<span class="text-red-500 text-[10px] font-bold">▼ ${Math.abs(aDiffNat)}% vs BU</span>`
@@ -1388,7 +1393,7 @@ function renderRMAM(){
         const bSold=sumSales(b,devs);
         const bT=sumAllTrades(b);
         const bAtt=pct(bT.agreed,bSold);
-        const bDanger=bAtt<15;
+        const bDanger=bAtt<35;
         const rowBg=bDanger?'bg-red-50':'';
         return`<tr class="${rowBg} border-b border-gray-100 text-xs">
           <td class="px-2 py-1.5 text-gray-400 text-center">${bi+1}</td>
@@ -1585,7 +1590,7 @@ function render(){
     const attP=pct(agreed,salesTotal);
     const as_=attStyle(attP);
     const bn=branch==='Unknown'?'ไม่ระบุสาขา':branch;
-    const headerBg=attP<15?'#CA3433':'#50C878';
+    const headerBg=attP<35?'#CA3433':'#50C878';
 
     const devRows=devs.map(d=>{
       const sold=(DATA.sales_by_branch[branch]||{})[d]||0;
@@ -1669,7 +1674,7 @@ function collectAIData(scope,scopeValue){
   });
   const sorted=[...branchData].sort((a,b)=>b.att-a.att||b.agreed-a.agreed);
   const top3=sorted.filter(b=>b.sold>0).slice(0,3);
-  const lowBranches=sorted.filter(b=>b.att<15&&b.sold>0);
+  const lowBranches=sorted.filter(b=>b.att<35&&b.sold>0);
   const overallATT=pct(totalAgreed,totalSold);
   const scopeLabels={country:'ภาพรวม BU Apple',bu:'BU: '+scopeValue,rm:'RSM: '+scopeValue,am:'ASM: '+scopeValue};
   const filterContext=scopeLabels[scope]||(scopeValue||'ทั้งหมด');
