@@ -1290,9 +1290,9 @@ function renderYearlyReport(){
 
 // ===== BRANCH × YEAR GROUPED BAR CHART =====
 let YEAR_CHART_AM = '';
+let CHART_TAB = 'store'; // 'rm'|'am'|'store'|'staff'
 function buildBranchYearChart(){
   if(!DATA||!DATA.trade_by_ym)return'';
-  const THAI_MTH=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   // Collect all CE years available in tradeByYm
   const years=new Set();
   Object.values(DATA.trade_by_ym).forEach(byYm=>Object.keys(byYm).forEach(ym=>years.add(ym.slice(0,4))));
@@ -1301,110 +1301,143 @@ function buildBranchYearChart(){
   const yr1=sortedYears[0], yr2=sortedYears[sortedYears.length-1];
   const be1=(parseInt(yr1)+543).toString().slice(-2);
   const be2=(parseInt(yr2)+543).toString().slice(-2);
-
-  // AM dropdown options (if has_amrm)
-  const amList=DATA.has_amrm?[...new Set(Object.values(DATA.branch_amrm).map(v=>v.am).filter(Boolean))].sort():[];
-  const amDropdown=amList.length?`<select id="year-chart-am" onchange="YEAR_CHART_AM=this.value;document.getElementById('year-chart-wrap').outerHTML=buildBranchYearChart()"
-    class="text-xs border border-gray-200 rounded-lg px-2 py-1 text-gray-600 bg-white focus:outline-none focus:border-[#1F3B2D]">
-    <option value="">ASM ทั้งหมด</option>
-    ${amList.map(a=>`<option value="${a}" ${YEAR_CHART_AM===a?'selected':''}>${a}</option>`).join('')}
-  </select>`:'';
-
-  // Collect branches to show (filter by AM if selected)
-  let branches=[...(DATA.all_branch_names||[])].filter(b=>b!=='Unknown').sort();
-  if(YEAR_CHART_AM&&DATA.has_amrm){
-    branches=branches.filter(b=>DATA.branch_amrm[b]?.am===YEAR_CHART_AM);
-  }
-
-  // Build per-branch per-year trade agreed totals
-  const branchData=branches.map(b=>{
-    const byYm=DATA.trade_by_ym[b]||{};
-    let a1=0,e1=0,a2=0,e2=0,s1=0,s2=0;
-    Object.entries(byYm).forEach(([ym,v])=>{
-      const y=ym.slice(0,4);
-      if(y===yr1){a1+=v.agreed;e1+=v.evaluated;}
-      else if(y===yr2){a2+=v.agreed;e2+=v.evaluated;}
-    });
-    // sales from salesByBranchYm
-    const sbYm=DATA.sales_by_branch_ym?.[b]||{};
-    const devs=getSelDevs();
-    Object.entries(sbYm).forEach(([ym,sb])=>{
-      const y=ym.slice(0,4);
-      const sold=devs.reduce((t,d)=>t+(sb[d]||0),0);
-      if(y===yr1)s1+=sold;
-      else if(y===yr2)s2+=sold;
-    });
-    const att1=s1>0?Math.round(a1/s1*100):0;
-    const att2=s2>0?Math.round(a2/s2*100):0;
-    return{b,a1,e1,s1,att1,a2,e2,s2,att2};
-  }).filter(r=>r.a1>0||r.a2>0);
-
-  if(!branchData.length)return`<div id="year-chart-wrap" class="bg-white rounded-xl shadow-card p-6 mt-4 text-center text-gray-400 text-sm">ไม่พบข้อมูลที่เปรียบเทียบได้ระหว่างปี ${yr1} และ ${yr2}</div>`;
-
-  // Sort by max ATT% desc
-  branchData.sort((a,b)=>Math.max(b.att1,b.att2)-Math.max(a.att1,a.att2)||b.a2-a.a2);
-
   const COL1='#6366f1'; // indigo — year 1
   const COL2='#f59e0b'; // amber — year 2
-  const maxAgreed=Math.max(...branchData.map(r=>Math.max(r.a1,r.a2)),1);
+  const CHART_H=100;
 
-  const bars=branchData.map(r=>{
-    const h1=Math.max(Math.round(r.a1/maxAgreed*80),r.a1>0?3:0);
-    const h2=Math.max(Math.round(r.a2/maxAgreed*80),r.a2>0?3:0);
-    const c1=r.att1>=35?'#22c55e':r.att1>0?'#ef4444':'#d1d5db';
-    const c2=r.att2>=35?'#22c55e':r.att2>0?'#ef4444':'#d1d5db';
-    const bn=r.b.length>10?r.b.slice(0,10)+'…':r.b;
-    return`<div style="display:flex;flex-direction:column;align-items:center;gap:2px;min-width:36px;flex:0 0 auto">
-      <div style="display:flex;flex-direction:column;align-items:center;font-size:9px;font-weight:700;color:${c2}">${r.att2>0?r.att2+'%':''}</div>
-      <div style="display:flex;gap:2px;align-items:flex-end;height:84px">
-        <div style="width:12px;background:${COL1};height:${h1}%;min-height:${r.a1>0?3:0}px;border-radius:2px 2px 0 0;opacity:0.85" title="${yr1} ตกลง:${r.a1} ประเมิน:${r.e1}"></div>
-        <div style="width:12px;background:${COL2};height:${h2}%;min-height:${r.a2>0?3:0}px;border-radius:2px 2px 0 0" title="${yr2} ตกลง:${r.a2} ประเมิน:${r.e2}"></div>
+  // ── Tab buttons ─────────────────────────────────────────────────────────────
+  const TABS=[{key:'rm',label:'📊 RM'},{key:'am',label:'📊 AM'},{key:'store',label:'📊 Store'},{key:'staff',label:'📊 Staff'}];
+  const tabHTML=TABS.map(t=>{
+    const active=CHART_TAB===t.key;
+    const cls=active
+      ?'px-3 py-1.5 rounded-lg text-xs font-bold bg-[#1F3B2D] text-white cursor-pointer border-0'
+      :'px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-100 text-gray-500 hover:bg-gray-200 cursor-pointer border-0';
+    return`<button class="${cls}" onclick="CHART_TAB='${t.key}';document.getElementById('year-chart-wrap').outerHTML=buildBranchYearChart()">${t.label}</button>`;
+  }).join('');
+
+  // ── Store base average ATT% (reference line) ─────────────────────────────
+  const devs=getSelDevs();
+  const totalAgreed=Object.values(DATA.trade_summary||{}).reduce((s,t)=>s+(t.agreed||0),0);
+  const totalSold=(()=>{let t=0;Object.values(DATA.sales_by_branch||{}).forEach(sb=>{t+=devs.reduce((s,d)=>s+(sb[d]||0),0);});return t;})();
+  const baseAtt=totalSold>0?+(totalAgreed/totalSold*100).toFixed(1):35;
+
+  // ── Build entity data per tab ─────────────────────────────────────────────
+  let entities=[];
+  let noAmrmMsg='';
+
+  if(CHART_TAB==='store'){
+    const branches=[...(DATA.all_branch_names||[])].filter(b=>b!=='Unknown').sort();
+    entities=branches.map(b=>{
+      const byYm=DATA.trade_by_ym[b]||{};
+      let a1=0,a2=0,s1=0,s2=0;
+      Object.entries(byYm).forEach(([ym,v])=>{const y=ym.slice(0,4);if(y===yr1)a1+=v.agreed;else if(y===yr2)a2+=v.agreed;});
+      const sbYm=DATA.sales_by_branch_ym?.[b]||{};
+      Object.entries(sbYm).forEach(([ym,sb])=>{const y=ym.slice(0,4);const sold=devs.reduce((t,d)=>t+(sb[d]||0),0);if(y===yr1)s1+=sold;else if(y===yr2)s2+=sold;});
+      const att1=s1>0?+(a1/s1*100).toFixed(1):0;
+      const att2=s2>0?+(a2/s2*100).toFixed(1):0;
+      return{name:b,att1,att2,s1,s2,a1,a2};
+    }).filter(r=>r.a1>0||r.a2>0);
+
+  }else if(CHART_TAB==='am'||CHART_TAB==='rm'){
+    if(!DATA.has_amrm){
+      noAmrmMsg=`<div id="year-chart-wrap" class="bg-white rounded-xl shadow-card p-6 mt-4 text-center text-gray-400 text-sm">⚠️ ต้องอัพโหลด ASM file เพื่อดูข้อมูล RM / AM</div>`;
+    }else{
+      const field=CHART_TAB==='am'?'am':'rm';
+      const map={};
+      Object.keys(DATA.trade_by_ym).forEach(b=>{
+        const eName=DATA.branch_amrm[b]?.[field];
+        if(!eName)return;
+        if(!map[eName])map[eName]={a1:0,s1:0,a2:0,s2:0};
+        Object.entries(DATA.trade_by_ym[b]||{}).forEach(([ym,v])=>{const y=ym.slice(0,4);if(y===yr1)map[eName].a1+=v.agreed;else if(y===yr2)map[eName].a2+=v.agreed;});
+        Object.entries(DATA.sales_by_branch_ym?.[b]||{}).forEach(([ym,sb])=>{const y=ym.slice(0,4);const sold=devs.reduce((t,d)=>t+(sb[d]||0),0);if(y===yr1)map[eName].s1+=sold;else if(y===yr2)map[eName].s2+=sold;});
+      });
+      entities=Object.entries(map).map(([name,v])=>({name,att1:v.s1>0?+(v.a1/v.s1*100).toFixed(1):0,att2:v.s2>0?+(v.a2/v.s2*100).toFixed(1):0,...v})).filter(r=>r.a1>0||r.a2>0);
+    }
+
+  }else if(CHART_TAB==='staff'){
+    const byEmp=DATA.by_emp_trade||{};
+    entities=Object.entries(byEmp).map(([empId,v])=>{
+      const sb=DATA.sales_by_emp?.[empId]||{};
+      const sold=devs.reduce((t,d)=>t+(sb[d]||0),0);
+      const att=sold>0?+(v.agreed/sold*100).toFixed(1):0;
+      return{name:v.name||empId,att1:0,att2:att,s1:0,s2:sold,a1:0,a2:v.agreed};
+    }).filter(r=>r.a2>0);
+  }
+
+  if(noAmrmMsg)return noAmrmMsg;
+  if(!entities.length)return`<div id="year-chart-wrap" class="bg-white rounded-xl shadow-card p-6 mt-4"><div class="flex gap-2 mb-3">${tabHTML}</div><p class="text-center text-gray-400 text-sm">ไม่พบข้อมูลในแท็บนี้</p></div>`;
+
+  // Sort by max ATT% desc, top 20
+  entities.sort((a,b)=>Math.max(b.att1,b.att2)-Math.max(a.att1,a.att2)||b.a2-a.a2);
+  entities=entities.slice(0,20);
+
+  const maxAtt=Math.max(...entities.map(r=>Math.max(r.att1,r.att2)),baseAtt,1);
+  const refPx=Math.round(baseAtt/maxAtt*CHART_H);
+
+  const bars=entities.map(r=>{
+    const h1=r.att1>0?Math.max(Math.round(r.att1/maxAtt*CHART_H),3):0;
+    const h2=r.att2>0?Math.max(Math.round(r.att2/maxAtt*CHART_H),3):0;
+    const lc2=r.att2>=35?'#22c55e':r.att2>0?'#ef4444':'#d1d5db';
+    const bn=r.name.length>10?r.name.slice(0,10)+'…':r.name;
+    const lbl1=r.att1>0?`<span style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);font-size:7px;font-weight:800;color:white;white-space:nowrap">${r.att1}%</span>`:'';
+    const lbl2=r.att2>0?`<span style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);font-size:7px;font-weight:800;color:white;white-space:nowrap">${r.att2}%</span>`:'';
+    return`<div style="display:flex;flex-direction:column;align-items:center;gap:2px;min-width:40px;flex:0 0 auto">
+      <div style="font-size:9px;font-weight:800;color:${lc2}">${r.att2>0?r.att2+'%':''}</div>
+      <div style="display:flex;gap:2px;align-items:flex-end;height:${CHART_H}px;position:relative">
+        <div style="width:13px;background:${COL1};height:${h1}px;border-radius:2px 2px 0 0;opacity:0.9;position:relative" title="ปี ${yr1+543} ATT%:${r.att1}%">${lbl1}</div>
+        <div style="width:13px;background:${COL2};height:${h2}px;border-radius:2px 2px 0 0;position:relative" title="ปี ${yr2+543} ATT%:${r.att2}%">${lbl2}</div>
       </div>
-      <div style="font-size:8px;color:#9ca3af;text-align:center;max-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.b}">${bn}</div>
+      <div style="font-size:7px;color:#9ca3af;text-align:center;max-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.name}">${bn}</div>
     </div>`;
   }).join('');
 
   // Summary table
-  const tableRows=branchData.map((r,i)=>{
-    const diff=r.att2-r.att1;
+  const entityLabel=CHART_TAB==='rm'?'RM':CHART_TAB==='am'?'AM':CHART_TAB==='store'?'สาขา':'พนักงาน';
+  const tableRows=entities.map((r,i)=>{
+    const diff=+(r.att2-r.att1).toFixed(1);
     const diffTxt=diff>0?`<span class="text-emerald-500 font-bold">▲${diff}%</span>`:diff<0?`<span class="text-red-400 font-bold">▼${Math.abs(diff)}%</span>`:`<span class="text-gray-400">–</span>`;
     const a1c=r.att1>=35?'#22c55e':r.att1>0?'#ef4444':'#9ca3af';
     const a2c=r.att2>=35?'#22c55e':r.att2>0?'#ef4444':'#9ca3af';
     return`<tr class="border-b border-gray-100 hover:bg-gray-50 text-xs">
       <td class="px-2 py-1.5 text-center text-gray-400">${i+1}</td>
-      <td class="px-2 py-1.5 font-medium text-gray-700 max-w-[110px] truncate" title="${r.b}">${r.b}</td>
-      <td class="px-2 py-1.5 text-center font-bold" style="color:${a1c}">${r.att1}%</td>
+      <td class="px-2 py-1.5 font-medium text-gray-700 max-w-[120px] truncate" title="${r.name}">${r.name}</td>
+      <td class="px-2 py-1.5 text-center font-bold" style="color:${a1c}">${r.att1>0?r.att1+'%':'–'}</td>
       <td class="px-2 py-1.5 text-center text-gray-400">${r.a1}/${r.s1}</td>
-      <td class="px-2 py-1.5 text-center font-bold" style="color:${a2c}">${r.att2}%</td>
+      <td class="px-2 py-1.5 text-center font-bold" style="color:${a2c}">${r.att2>0?r.att2+'%':'–'}</td>
       <td class="px-2 py-1.5 text-center text-gray-400">${r.a2}/${r.s2}</td>
       <td class="px-2 py-1.5 text-center">${diffTxt}</td>
     </tr>`;
   }).join('');
 
+  // AM Branch Compare (only when AM tab)
+  const amSection=CHART_TAB==='am'?buildAMBranchCompare(yr1,yr2,be1,be2,COL1,COL2,baseAtt):'';
+
   return`<div id="year-chart-wrap" class="bg-white rounded-xl shadow-card p-4 mt-4">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
       <div>
-        <div class="text-sm font-bold text-gray-700">📊 เปรียบเทียบรายสาขา ปี ${yr1+543} vs ${yr2+543}</div>
-        <div class="text-xs text-gray-400">จากข้อมูลในไฟล์ trade_search ทั้งหมด (ไม่กรองตามเดือน)</div>
+        <div class="text-sm font-bold text-gray-700">📊 Performance Chart — ปี ${yr1+543} vs ${yr2+543}</div>
+        <div class="text-xs text-gray-400">ATT% เรียงสูงสุด 20 อันดับ · ข้อมูลทั้งปีจาก trade_search</div>
       </div>
-      <div class="flex items-center gap-3 flex-wrap">
-        <div class="flex items-center gap-4 text-xs text-gray-400">
-          <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;background:${COL1};border-radius:2px"></span>ปี ${yr1+543}</span>
-          <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;background:${COL2};border-radius:2px"></span>ปี ${yr2+543}</span>
-        </div>
-        ${amDropdown}
-      </div>
+      <div class="flex items-center gap-1.5 flex-wrap">${tabHTML}</div>
     </div>
     <div style="overflow-x:auto;padding-bottom:4px">
-      <div style="display:flex;align-items:flex-end;gap:4px;min-height:110px;padding-bottom:2px;min-width:max-content">
+      <div style="display:flex;align-items:flex-end;gap:4px;min-height:${CHART_H+20}px;padding-bottom:2px;min-width:max-content;position:relative">
+        <div style="position:absolute;bottom:${refPx}px;left:0;right:0;border-top:2px dashed #ef4444;z-index:1;pointer-events:none">
+          <span style="position:absolute;right:4px;top:-14px;font-size:9px;color:#ef4444;font-weight:700">Base ${baseAtt}%</span>
+        </div>
         ${bars}
       </div>
     </div>
-    <div class="mt-4 overflow-x-auto">
+    <div class="flex items-center gap-4 mt-2 mb-4 text-xs text-gray-400">
+      <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;background:${COL1};border-radius:2px;opacity:0.9"></span>Year ${be1} (ปี ${yr1+543})</span>
+      <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;background:${COL2};border-radius:2px"></span>Year ${be2} (ปี ${yr2+543})</span>
+      <span class="flex items-center gap-1"><span style="display:inline-block;width:18px;border-top:2px dashed #ef4444"></span>Store Base</span>
+    </div>
+    <div class="overflow-x-auto">
       <table class="w-full min-w-[480px]">
         <thead><tr class="bg-gray-50 text-[10px] text-gray-500 uppercase">
           <th class="px-2 py-1.5 w-8">#</th>
-          <th class="px-2 py-1.5 text-left">สาขา</th>
+          <th class="px-2 py-1.5 text-left">${entityLabel}</th>
           <th class="px-2 py-1.5 text-center" style="color:${COL1}">ATT% ${yr1+543}</th>
           <th class="px-2 py-1.5 text-center text-gray-400">ตกลง/ขาย ${yr1+543}</th>
           <th class="px-2 py-1.5 text-center" style="color:${COL2}">ATT% ${yr2+543}</th>
@@ -1413,6 +1446,77 @@ function buildBranchYearChart(){
         </tr></thead>
         <tbody>${tableRows}</tbody>
       </table>
+    </div>
+    ${amSection}
+  </div>`;
+}
+
+// ── AM Branch Compare: second chart (visible only when AM tab) ───────────────
+function buildAMBranchCompare(yr1,yr2,be1,be2,COL1,COL2,baseAtt){
+  if(!DATA||!DATA.has_amrm)return'';
+  const amList=[...new Set(Object.values(DATA.branch_amrm).map(v=>v.am).filter(Boolean))].sort();
+  if(!amList.length)return'';
+  if(!YEAR_CHART_AM||!amList.includes(YEAR_CHART_AM))YEAR_CHART_AM=amList[0];
+
+  const amDropdown=`<select onchange="YEAR_CHART_AM=this.value;document.getElementById('year-chart-wrap').outerHTML=buildBranchYearChart()"
+    class="text-xs border border-gray-200 rounded-lg px-2 py-1 text-gray-600 bg-white focus:outline-none focus:border-[#1F3B2D]">
+    ${amList.map(a=>`<option value="${a}" ${YEAR_CHART_AM===a?'selected':''}>${a}</option>`).join('')}
+  </select>`;
+
+  const devs=getSelDevs();
+  const branchData=Object.entries(DATA.branch_amrm)
+    .filter(([,v])=>v.am===YEAR_CHART_AM)
+    .map(([b])=>{
+      const byYm=DATA.trade_by_ym[b]||{};
+      let a1=0,a2=0,s1=0,s2=0;
+      Object.entries(byYm).forEach(([ym,v])=>{const y=ym.slice(0,4);if(y===yr1)a1+=v.agreed;else if(y===yr2)a2+=v.agreed;});
+      Object.entries(DATA.sales_by_branch_ym?.[b]||{}).forEach(([ym,sb])=>{const y=ym.slice(0,4);const sold=devs.reduce((t,d)=>t+(sb[d]||0),0);if(y===yr1)s1+=sold;else if(y===yr2)s2+=sold;});
+      const att1=s1>0?+(a1/s1*100).toFixed(1):0;
+      const att2=s2>0?+(a2/s2*100).toFixed(1):0;
+      return{name:b,att1,att2,s1,s2,a1,a2};
+    }).filter(r=>r.a1>0||r.a2>0);
+
+  if(!branchData.length)return`<div class="mt-4 border-t border-gray-100 pt-4 text-center text-gray-400 text-xs py-4">ไม่พบข้อมูลสาขาของ AM: ${YEAR_CHART_AM}</div>`;
+
+  branchData.sort((a,b)=>Math.max(b.att1,b.att2)-Math.max(a.att1,a.att2));
+  const CHART_H=100;
+  const maxAtt=Math.max(...branchData.map(r=>Math.max(r.att1,r.att2)),baseAtt,1);
+  const refPx=Math.round(baseAtt/maxAtt*CHART_H);
+
+  const bars=branchData.map(r=>{
+    const h1=r.att1>0?Math.max(Math.round(r.att1/maxAtt*CHART_H),3):0;
+    const h2=r.att2>0?Math.max(Math.round(r.att2/maxAtt*CHART_H),3):0;
+    const lc2=r.att2>=35?'#22c55e':r.att2>0?'#ef4444':'#d1d5db';
+    const bn=r.name.length>10?r.name.slice(0,10)+'…':r.name;
+    const lbl1=r.att1>0?`<span style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);font-size:7px;font-weight:800;color:white;white-space:nowrap">${r.att1}%</span>`:'';
+    const lbl2=r.att2>0?`<span style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);font-size:7px;font-weight:800;color:white;white-space:nowrap">${r.att2}%</span>`:'';
+    return`<div style="display:flex;flex-direction:column;align-items:center;gap:2px;min-width:44px;flex:0 0 auto">
+      <div style="font-size:9px;font-weight:800;color:${lc2}">${r.att2>0?r.att2+'%':''}</div>
+      <div style="display:flex;gap:2px;align-items:flex-end;height:${CHART_H}px;position:relative">
+        <div style="width:14px;background:${COL1};height:${h1}px;border-radius:2px 2px 0 0;opacity:0.9;position:relative" title="Year ${be1} ATT%:${r.att1}%">${lbl1}</div>
+        <div style="width:14px;background:${COL2};height:${h2}px;border-radius:2px 2px 0 0;position:relative" title="Year ${be2} ATT%:${r.att2}%">${lbl2}</div>
+      </div>
+      <div style="font-size:7px;color:#9ca3af;text-align:center;max-width:44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.name}">${bn}</div>
+    </div>`;
+  }).join('');
+
+  return`<div class="mt-4 border-t-2 border-gray-100 pt-4">
+    <div class="flex flex-wrap items-center gap-2 mb-3">
+      <div class="text-sm font-bold text-gray-700">Branch ATT% by AM — Year Compare</div>
+      ${amDropdown}
+    </div>
+    <div style="overflow-x:auto;padding-bottom:4px">
+      <div style="display:flex;align-items:flex-end;gap:4px;min-height:${CHART_H+20}px;padding-bottom:2px;min-width:max-content;position:relative">
+        <div style="position:absolute;bottom:${refPx}px;left:0;right:0;border-top:2px dashed #ef4444;z-index:1;pointer-events:none">
+          <span style="position:absolute;right:4px;top:-14px;font-size:9px;color:#ef4444;font-weight:700">Base ${baseAtt}%</span>
+        </div>
+        ${bars}
+      </div>
+    </div>
+    <div class="flex items-center gap-4 mt-2 text-xs text-gray-400">
+      <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;background:${COL1};border-radius:2px;opacity:0.9"></span>Year ${be1}</span>
+      <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;background:${COL2};border-radius:2px"></span>Year ${be2}</span>
+      <span class="flex items-center gap-1"><span style="display:inline-block;width:18px;border-top:2px dashed #ef4444"></span>Store Base</span>
     </div>
   </div>`;
 }
