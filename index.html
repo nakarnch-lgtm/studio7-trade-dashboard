@@ -589,7 +589,10 @@ function parseASMFile(rows, salesKeys, salesBranchIdMap={}, salesFileIds=null){
   const map={};
   rows.forEach(r=>{
     const raw=s(r['Name']||r['BRANCH_NAME']||r['Branch']||'');
-    const asmId=String(Number(s(r['ID']||''))||0);
+    // ลองหลายชื่อคอลัมน์ ID; fallback: extract จากชื่อ "ID<n> : ..."
+    const _rawAsmId=s(r['ID']||r['Branch (ID)']||r['BRANCH_ID']||r['รหัสสาขา']||'');
+    let asmId=String(Number(_rawAsmId)||0);
+    if(asmId==='0'){const _idm=raw.match(/^ID(\d+)\s*:\s*/i);if(_idm)asmId=String(parseInt(_idm[1],10));}
     let matched;
     // ลำดับที่ 1: จับคู่ด้วย ID → ได้ชื่อ canonical จาก sales file (ถูกต้องที่สุด)
     if(asmId&&asmId!=='0'&&salesBranchIdMap[asmId]){
@@ -754,7 +757,9 @@ async function processFiles(){
       }
       const oid=s(r[kOff]);
       if(oid){ const nm=s(r[kOffName]); if(nm&&!empNameMap[oid])empNameMap[oid]=nm; }
-      const _bid=String(Number(s(r[kBranchId]))||0);
+      let _bid=String(Number(s(r[kBranchId]))||0);
+      // Fallback: extract branch ID จากชื่อสาขา "ID<n> : <name>" ถ้าไม่มีคอลัมน์ Branch (ID) แยก
+      if(_bid==='0'){const _idm=s(r[kBranch]).match(/^ID(\d+)\s*:\s*/i);if(_idm)_bid=String(parseInt(_idm[1],10));}
       if(_bid&&_bid!=='0'&&!salesBranchIdMap[_bid]){
         const _bn=shortBranch(s(r[kBranch]));
         if(_bn&&_bn!=='Unknown')salesBranchIdMap[_bid]=_bn;
