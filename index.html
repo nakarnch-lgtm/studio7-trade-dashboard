@@ -516,6 +516,7 @@ function normBranch(b){
     .replace(/\(ustore\)/gi,' ustore ')
     .replace(/\([^)]*\)/g,' ')
     .replace(/[^a-z0-9ก-๙]/g,' ')
+    .replace(/([a-z])(\d)/g,'$1 $2')
     .replace(/\s+/g,' ').trim();
   _normCache.set(b,r);
   return r;
