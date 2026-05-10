@@ -617,7 +617,7 @@ function parseASMFile(rows, salesKeys, salesBranchIdMap={}, salesFileIds=null){
       am: s(r['AM']||'').trim(),
       rm: s(r['RM']||'').trim(),
       bu: s(r['BU']||'').trim(),
-      id: r['ID']||''
+      id: asmId||r['ID']||''
     };
   });
   return map;
