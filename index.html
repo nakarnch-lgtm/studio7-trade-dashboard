@@ -1238,9 +1238,11 @@ function buildMonthlyData(){
       });
     });
   }
-  // Merge
-  const allYMs=new Set([...Object.keys(salesByMonth),...Object.keys(tradeByMonth)]);
-  return [...allYMs].sort().map(ym=>{
+  // Merge — กรองตามช่วงวันที่ที่เลือก
+  const _activeSet=new Set(getActiveYMs());
+  const _allRaw=[...new Set([...Object.keys(salesByMonth),...Object.keys(tradeByMonth)])].sort();
+  const _filtered=(DATE_RANGE_START||DATE_RANGE_END)?_allRaw.filter(ym=>_activeSet.has(ym)):_allRaw;
+  return _filtered.map(ym=>{
     const [y,mo]=ym.split('-'); const mn=parseInt(mo);
     const beY=(parseInt(y)+543).toString().slice(-2);
     const sm=salesByMonth[ym]||{};
@@ -1357,9 +1359,12 @@ let YEAR_CHART_AM = '';
 let CHART_TAB = 'store'; // ยังคง declare ไว้เพื่อไม่ให้ reference อื่น error
 function buildBranchYearChart(){
   if(!DATA||!DATA.trade_by_ym)return'';
-  // Collect all CE years available in tradeByYm
-  const years=new Set();
-  Object.values(DATA.trade_by_ym).forEach(byYm=>Object.keys(byYm).forEach(ym=>years.add(ym.slice(0,4))));
+  // ใช้ active YMs จาก date range filter (ถ้าไม่มี filter = ทั้งหมด)
+  const activeYMs=getActiveYMs();
+  const activeYMSet=new Set(activeYMs);
+  if(!activeYMs.length)return'';
+  // หา CE years จาก active YMs เท่านั้น
+  const years=new Set(activeYMs.map(ym=>ym.slice(0,4)));
   if(!years.size)return'';
   const multiYear=years.size>=2;
   const sortedYears=[...years].sort();
@@ -1370,17 +1375,12 @@ function buildBranchYearChart(){
   const COL2='#f59e0b';
   const CHART_H=100;
 
-  // ── Single-year mode: last 4 months ──────────────────────────────────────
-  let last4YMs=[];
-  let last4Label='';
-  if(!multiYear){
-    const allYMs=new Set();
-    Object.values(DATA.trade_by_ym).forEach(byYm=>Object.keys(byYm).forEach(ym=>allYMs.add(ym)));
-    last4YMs=[...allYMs].sort().slice(-4);
-    const THAI_MTH=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-    last4Label=last4YMs.map(ym=>{const[y,m]=ym.split('-');return THAI_MTH[+m]+' '+(+y+543);}).join(', ');
-    if(!last4YMs.length)return'';
-  }
+  // ── Single-year label ─────────────────────────────────────────────────────
+  const THAI_MTH_C=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const ymRangeLabel=activeYMs.length>0
+    ?`${THAI_MTH_C[+activeYMs[0].split('-')[1]]} ${+activeYMs[0].split('-')[0]+543}`
+     +(activeYMs.length>1?` – ${THAI_MTH_C[+activeYMs[activeYMs.length-1].split('-')[1]]} ${+activeYMs[activeYMs.length-1].split('-')[0]+543}`:'')
+    :'';
 
   const devs=getSelDevs();
 
@@ -1411,7 +1411,7 @@ function buildBranchYearChart(){
     return{a,s:sv};
   };
 
-  const ymSet4=new Set(last4YMs);
+  // ใช้ activeYMSet แทน ymSet4 ในทุก entity calculation
 
   // ── Build entities ────────────────────────────────────────────────────────
   let entities=[];
@@ -1424,12 +1424,12 @@ function buildBranchYearChart(){
       if(multiYear){
         const byYm=DATA.trade_by_ym[b]||{};
         let a1=0,a2=0,s1=0,s2=0;
-        Object.entries(byYm).forEach(([ym,v])=>{const y=ym.slice(0,4);if(y===yr1)a1+=v.agreed;else if(y===yr2)a2+=v.agreed;});
+        Object.entries(byYm).forEach(([ym,v])=>{if(!activeYMSet.has(ym))return;const y=ym.slice(0,4);if(y===yr1)a1+=v.agreed;else if(y===yr2)a2+=v.agreed;});
         const sbYm=DATA.sales_by_branch_ym?.[b]||{};
-        Object.entries(sbYm).forEach(([ym,sb])=>{const y=ym.slice(0,4);const sold=devs.reduce((t,d)=>t+(sb[d]||0),0);if(y===yr1)s1+=sold;else if(y===yr2)s2+=sold;});
+        Object.entries(sbYm).forEach(([ym,sb])=>{if(!activeYMSet.has(ym))return;const y=ym.slice(0,4);const sold=devs.reduce((t,d)=>t+(sb[d]||0),0);if(y===yr1)s1+=sold;else if(y===yr2)s2+=sold;});
         return{name:b,att1:s1>0?+(a1/s1*100).toFixed(1):0,att2:s2>0?+(a2/s2*100).toFixed(1):0,s1,s2,a1,a2};
       }else{
-        const{a,s}=sumBranch(b,ymSet4);
+        const{a,s}=sumBranch(b,activeYMSet);
         return{name:b,att1:0,att2:s>0?+(a/s*100).toFixed(1):0,s1:0,s2:s,a1:0,a2:a};
       }
     }).filter(r=>r.a2>0||(multiYear&&r.a1>0));
@@ -1450,10 +1450,10 @@ function buildBranchYearChart(){
       const eName=bInfo[field]; if(!eName)return;
       if(!map[eName])map[eName]={a1:0,s1:0,a2:0,s2:0};
       if(multiYear){
-        Object.entries(DATA.trade_by_ym[b]||{}).forEach(([ym,v])=>{const y=ym.slice(0,4);if(y===yr1)map[eName].a1+=v.agreed;else if(y===yr2)map[eName].a2+=v.agreed;});
-        Object.entries(DATA.sales_by_branch_ym?.[b]||{}).forEach(([ym,sb])=>{const y=ym.slice(0,4);const sold=devs.reduce((t,d)=>t+(sb[d]||0),0);if(y===yr1)map[eName].s1+=sold;else if(y===yr2)map[eName].s2+=sold;});
+        Object.entries(DATA.trade_by_ym[b]||{}).forEach(([ym,v])=>{if(!activeYMSet.has(ym))return;const y=ym.slice(0,4);if(y===yr1)map[eName].a1+=v.agreed;else if(y===yr2)map[eName].a2+=v.agreed;});
+        Object.entries(DATA.sales_by_branch_ym?.[b]||{}).forEach(([ym,sb])=>{if(!activeYMSet.has(ym))return;const y=ym.slice(0,4);const sold=devs.reduce((t,d)=>t+(sb[d]||0),0);if(y===yr1)map[eName].s1+=sold;else if(y===yr2)map[eName].s2+=sold;});
       }else{
-        const{a,s}=sumBranch(b,ymSet4);
+        const{a,s}=sumBranch(b,activeYMSet);
         map[eName].a2+=a; map[eName].s2+=s;
       }
     });
@@ -1545,16 +1545,16 @@ function buildBranchYearChart(){
   const legend=multiYear
     ?`<span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;background:${COL1};border-radius:2px;opacity:0.9"></span>ปี ${yr1+543}</span>
       <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;background:${COL2};border-radius:2px"></span>ปี ${yr2+543}</span>`
-    :`<span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;background:${COL2};border-radius:2px"></span>ATT% (4 เดือนล่าสุด)</span>`;
+    :`<span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:10px;background:${COL2};border-radius:2px"></span>ATT% ${ymRangeLabel}</span>`;
 
   const levelLabel={'rm':'RSM','am':'ASM','store':'สาขา','staff':'พนักงาน'};
   const scopeLabel=selAM?` — ${selAM}`:selRM?` — ${selRM}`:'';
   const chartTitle=multiYear
     ?`📊 Performance ราย${levelLabel[chartLevel]}${scopeLabel} — ปี ${yr1+543} vs ${yr2+543}`
-    :`📊 Performance ราย${levelLabel[chartLevel]}${scopeLabel} — 4 เดือนล่าสุด`;
+    :`📊 Performance ราย${levelLabel[chartLevel]}${scopeLabel}`;
   const chartSub=multiYear
-    ?`ATT% เรียงสูงสุด 20 อันดับ`
-    :`${last4Label} · ATT% เรียงสูงสุด 20 อันดับ`;
+    ?`${ymRangeLabel} · ATT% เรียงสูงสุด 20 อันดับ`
+    :`${ymRangeLabel} · ATT% เรียงสูงสุด 20 อันดับ`;
 
   return`<div id="year-chart-wrap" class="bg-white rounded-xl shadow-card p-4 mt-4">
     <div class="mb-3">
@@ -2196,6 +2196,7 @@ function onDateRangeChange(){
   render();
   if(currentView==='emp'&&DATA) renderEmpSummary(getSelDevs(), getAMRMBranches());
   if(currentView==='rmam'&&DATA) renderRMAM();
+  if(currentView==='year'&&DATA) renderYearlyReport();
 }
 function resetDateRange(){
   const yms=DATA?.available_yms||[];
@@ -2216,6 +2217,7 @@ function resetDateRange(){
     render();
     if(currentView==='emp') renderEmpSummary(getSelDevs(), getAMRMBranches());
     if(currentView==='rmam') renderRMAM();
+    if(currentView==='year') renderYearlyReport();
   }
 }
 
