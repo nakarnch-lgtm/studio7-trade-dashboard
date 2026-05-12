@@ -671,15 +671,21 @@ function parseTradeSearch(rows, activeDates, salesKeys, empNameMap={}, salesBran
   // Map สถานะ Thai text → numeric code (เหมือน server-side kpi-calculator)
   const THAI_STATUS_CODE={'สิ้นสุดการประเมินราคา':5,'ยืนยันราคาแล้ว':7,'ยกเลิกรายการ':6,'รอผู้ขายยืนยันราคา':3,'รอการประเมินราคา':1,'อยู่ระหว่างผู้รับซื้อให้ราคา':2,'กำลังสร้างเอกสาร':4};
   rows.forEach(r=>{
-    // ใช้ branch_code / รหัสสาขา / BRANCH_ID (ID ตัวเลข) จับคู่กับ salesBranchIdMap ก่อน
-    let branch, isMatchedToSales;
-    const rawCode=s(r['branch_code']||r['รหัสสาขา']||r['BRANCH_ID']||'');
+    // ===== Branch matching =====
+    // บางสาขา ชื่อสาขา = "ID2926 Studio7-STA-Pakchong" (ไม่มี colon)
+    // → ต้อง extract ID + strip prefix ก่อน name matching
+    let rawBranch=s(r['ชื่อสาขา']||r['BRANCH_NAME']||'');
+    let extractedId='';
+    const idNoColonM=rawBranch.match(/^ID(\d+)\s+(.+)/i);
+    if(idNoColonM){extractedId=idNoColonM[1];rawBranch=idNoColonM[2];}
+    // ลำดับ: branch_code → real_branch_id → รหัสสาขา → BRANCH_ID → extracted ID จาก ชื่อสาขา
+    const rawCode=s(r['branch_code']||r['real_branch_id']||r['รหัสสาขา']||r['BRANCH_ID']||extractedId||'');
     const branchId=rawCode?String(parseInt(rawCode,10)||0):'';
+    let branch, isMatchedToSales;
     if(branchId&&branchId!=='0'&&salesBranchIdMap[branchId]){
       branch=salesBranchIdMap[branchId];
       isMatchedToSales=true;
     } else {
-      const rawBranch=s(r['ชื่อสาขา']||r['BRANCH_NAME']||'');
       if(!rawBranch)return;
       const nameMatch=matchBranch(rawBranch,salesKeys);
       if(nameMatch&&nameMatch!==rawBranch){
@@ -687,7 +693,6 @@ function parseTradeSearch(rows, activeDates, salesKeys, empNameMap={}, salesBran
         isMatchedToSales=true;
       } else {
         // ไม่สามารถ match กับ sales file ได้ → ใช้ชื่อดิบ และไม่ filter ตามวันที่
-        // เพื่อให้สาขาที่ไม่มีใน sales file ยังแสดงใน dashboard ได้
         branch=rawBranch;
         isMatchedToSales=false;
       }
