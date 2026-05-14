@@ -545,22 +545,34 @@ function isoDateRangeFromSalesActiveDates(activeDates){
   if(start>end){ var x=start; start=end; end=x; }
   return { start:start.toISOString().slice(0,10), end:end.toISOString().slice(0,10) };
 }
-/** limit ตามความยาวช่วงวันที่ (ไม่ดึงเกินจำเป็นโดยไม่จำเป็น) */
+/** API ไม่รองรับ pagination — ใช้ limit สูงสุดที่ทดสอบแล้ว (50k) เพื่อไม่ให้ยอดเทรดหายจากถูกตัด */
 function tradeApiLimitForIsoRange(startIso, endIso){
-  var a=new Date(startIso).getTime(), b=new Date(endIso).getTime();
-  var days=Math.max(1, Math.ceil((b-a)/86400000));
-  return String(Math.min(50000, Math.max(800, days*150)));
+  return '50000';
 }
-/** กรองแถวเทรดจาก API ให้เหลือเฉพาะสาขาที่มีในไฟล์ขาย (ตามรหัสสาขา) — ลดข้อมูลก่อน parseTradeSearch */
-function filterTradeRowsBySalesBranchIds(rows, salesBranchIdMap){
-  var idSet=new Set(Object.keys(salesBranchIdMap));
-  if(idSet.size===0) return rows;
-  return rows.filter(function(r){
-    var bc=s(r['branch_code']||r['real_branch_id']||'');
-    var id=bc?String(parseInt(bc,10)||''):'';
-    if(!id||id==='0') return true;
-    return idSet.has(id);
+/**
+ * ขยาย activeDates เป็นทุกวันปฏิทินระหว่าง min–max ของวันที่ในไฟล์ขาย
+ * (เดิมมีแค่วันที่มีบรรทัดขาย → trade วันที่ไม่มีขายในวันนั้นถูกตัดหมด ทำให้ยอดประเมินไม่ตรง)
+ */
+function expandActiveDatesHull(activeDates){
+  if(!activeDates||activeDates.size===0) return activeDates;
+  var minT=Infinity, maxT=-Infinity;
+  activeDates.forEach(function(ds){
+    var m=String(ds).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if(!m) return;
+    var t=new Date(parseInt(m[3],10), parseInt(m[2],10)-1, parseInt(m[1],10)).getTime();
+    if(t<minT) minT=t;
+    if(t>maxT) maxT=t;
   });
+  if(!isFinite(minT)) return activeDates;
+  var out=new Set();
+  for(var t=minT;t<=maxT;t+=86400000){
+    var d=new Date(t);
+    var dd=String(d.getDate()).padStart(2,'0');
+    var mm=String(d.getMonth()+1).padStart(2,'0');
+    var yy=d.getFullYear();
+    out.add(dd+'/'+mm+'/'+yy);
+  }
+  return out;
 }
 /**
  * @param {string|null} startIso - YYYY-MM-DD หรือ null = default 12 เดือนล่าสุด
@@ -582,7 +594,7 @@ async function fetchTradeApiRows(startIso, endIso, limitStr){
   }
   url.searchParams.set('start_date', start);
   url.searchParams.set('end_date', end);
-  url.searchParams.set('limit', limitStr||'5000');
+  url.searchParams.set('limit', limitStr||'50000');
 
   const resp = await fetch(url.toString());
   if (!resp.ok) throw new Error('โหลดข้อมูลเทรดจาก API ไม่สำเร็จ (' + resp.status + ')');
@@ -610,7 +622,7 @@ function mapTradeApiToRows(trades){
       'branch_code': code,
       'วันที่คำสั่งเทรด': t.document_date || '',
       'BIDDING_STATUS': bst,
-      'สถานะ': t.BIDDING_STATUS_NAME || '',
+      'สถานะ': String(t.BIDDING_STATUS_NAME != null ? t.BIDDING_STATUS_NAME : '').replace(/\s+/g,' ').trim(),
       'รหัสพนักงานขาย': String(t.SALE_CODE || t.sale_code || ''),
       'ชื่อพนักงานขาย': t.SALE_NAME || t.sale_name || t.employee_name || '',
     };
@@ -792,9 +804,8 @@ function devFromProduct(prod){
 // billToEmp = {billNo(string) → {empId,name,branch}} lookup จากเลขบิล Sales คอลัม Q
 // tBillCol = ชื่อ header ของคอลัม IT ในไฟล์เทรด (เลขบิลขาย)
 function parseTradeSearch(rows, activeDates, salesKeys, empNameMap={}, salesBranchIdMap={}, billToEmp={}, tBillCol=null){
-  // ตกลงเทรด = สิ้นสุดการประเมินราคา (5) เท่านั้น
-  // ยอดประเมิน = ทุกสถานะ (นับทุก row)
-  const AGREED_STATUS=new Set([5]);
+  // ตกลง: สิ้นสุดการประเมินราคา (5) + ยืนยันราคาแล้ว (7) — ยอดประเมิน = ทุกสถานะ (นับทุก row)
+  const AGREED_STATUS=new Set([5,7]);
   const summary={};
   const byEmp={};
   // Map สถานะ Thai text → numeric code (เหมือน server-side kpi-calculator)
@@ -838,7 +849,8 @@ function parseTradeSearch(rows, activeDates, salesKeys, empNameMap={}, salesBran
     // TechTrade API ส่ง status เป็นตัวเลขคนละชุดกับ Excel (เช่น status "3" แต่ BIDDING_STATUS_NAME = "สิ้นสุดการประเมินราคา")
     // → ถ้ามีข้อความสถานะไทยให้ map จากข้อความก่อน ค่อย fallback ตัวเลข
     let bst=0;
-    const stText=s(r['สถานะ']||r['BIDDING_STATUS_NAME']||'');
+    var stRaw=s(r['สถานะ']||r['BIDDING_STATUS_NAME']||'');
+    var stText=stRaw.replace(/\s+/g,' ').trim();
     if(stText&&THAI_STATUS_CODE[stText]){
       bst=THAI_STATUS_CODE[stText];
     } else if(r['BIDDING_STATUS']!=null&&r['BIDDING_STATUS']!==''){
@@ -961,7 +973,7 @@ async function processFiles(){
     var isoRange=isoDateRangeFromSalesActiveDates(activeDates);
     var limitStr=isoRange?tradeApiLimitForIsoRange(isoRange.start, isoRange.end):'5000';
     var trades=await fetchTradeApiRows(isoRange&&isoRange.start, isoRange&&isoRange.end, limitStr);
-    var tRows=filterTradeRowsBySalesBranchIds(mapTradeApiToRows(trades), salesBranchIdMap);
+    var tRows=mapTradeApiToRows(trades);
     const tradeFormat0='search';
     const tradeFileRows=[];
 
@@ -976,12 +988,13 @@ async function processFiles(){
     if(!tBillCol&&tKeys.includes('invoice_no'))tBillCol='invoice_no';
 
     if(tradeFormat==='search'){
-      // activeDates สร้างแล้วใน PASS 1 — ใช้ได้เลย
+      // ใช้ hull วันที่ระหว่าง min–max จากไฟล์ขาย (ไม่ใช่แค่วันที่มีบรรทัดขาย) เพื่อไม่ตัด trade วันที่ไม่มี sale line
+      const tradeActiveDates=expandActiveDatesHull(activeDates);
       // กรองตามวันที่ขาย Device; ถ้าไม่มี overlap ให้ fallback แสดงข้อมูลทั้งหมด
-      let result=parseTradeSearch(tRows,activeDates,salesKeys,empNameMap,salesBranchIdMap,billToEmp,tBillCol);
+      let result=parseTradeSearch(tRows,tradeActiveDates,salesKeys,empNameMap,salesBranchIdMap,billToEmp,tBillCol);
       const totalFiltered=Object.values(result.summary).reduce((s,v)=>s+v.evaluated,0);
       let dateFiltered=true;
-      if(totalFiltered===0&&activeDates.size>0){
+      if(totalFiltered===0&&tradeActiveDates.size>0){
         // ไม่มี overlap — fallback แสดงข้อมูลทั้งหมดในไฟล์เทรด
         result=parseTradeSearch(tRows,new Set(),salesKeys,empNameMap,salesBranchIdMap,billToEmp,tBillCol);
         dateFiltered=false;
