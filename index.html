@@ -41,10 +41,10 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
         <div class="text-gray-400 text-sm font-medium">Trade In Dashboard</div>
       </div>
     </div>
-    <p class="text-gray-600 text-sm font-medium">อัปโหลดไฟล์ Excel 2–3 ไฟล์เพื่อเริ่มวิเคราะห์ข้อมูล</p>
+    <p class="text-gray-600 text-sm font-medium">อัปโหลดไฟล์ยอดขาย และ (ถ้ามี) ไฟล์ ASM/RSM เพื่อเริ่มวิเคราะห์ข้อมูล</p>
     <div class="mt-2 flex items-center justify-center gap-2 text-xs text-gray-400">
       <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
-      ประมวลผลในเบราว์เซอร์เท่านั้น · ไม่มีการส่งข้อมูลออก · รีเฟรชเพื่อล้างข้อมูล
+      ดึงข้อมูลเทรดจาก API อัตโนมัติ · ประมวลผลในเบราว์เซอร์เป็นหลัก · รีเฟรชเพื่อล้างข้อมูล
     </div>
   </div>
 
@@ -68,36 +68,18 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
       <input type="file" id="input-sales" accept=".xlsx,.xls" class="hidden" multiple onchange="onFileSelect(event,'sales')">
     </div>
 
-    <!-- File 2: Trade (Hybrid: API or File) -->
+    <!-- Step 2: Trade data from TechTrade API (report-trade.vercel.app) -->
     <div>
       <div class="flex items-center gap-2 mb-2.5">
         <span class="w-6 h-6 rounded-full bg-[#C8A96B] text-[#1F3B2D] flex items-center justify-center text-xs font-black shrink-0">2</span>
-        <span class="text-xs font-bold text-gray-600 uppercase tracking-wide">รายงานเทรด</span>
+        <span class="text-xs font-bold text-gray-600 uppercase tracking-wide">ข้อมูลเทรด (API)</span>
       </div>
-      <!-- API source card (shown when API has data) -->
-      <div id="trade-api-card" class="hidden bg-white rounded-2xl shadow-card border-2 border-[#C8A96B] p-4 text-center">
+      <div id="trade-api-card" class="bg-white rounded-2xl shadow-card border-2 border-[#C8A96B] p-4 text-center">
         <div class="text-2xl mb-1">🔗</div>
-        <div class="text-xs font-bold text-[#9E7A3F]">ใช้ข้อมูลจาก API</div>
-        <div id="trade-api-info" class="text-[10px] text-gray-500 mt-0.5"></div>
-        <div class="flex gap-1.5 mt-2.5">
-          <button onclick="setTradeApiMode(false)" id="trade-api-off" class="flex-1 text-[10px] font-semibold rounded-lg py-1 border border-gray-200 text-gray-500 hover:bg-gray-50">อัปโหลดไฟล์แทน</button>
-          <button onclick="setTradeApiMode(true)" id="trade-api-on" class="flex-1 text-[10px] font-bold rounded-lg py-1 bg-[#1F3B2D] text-white">✓ ใช้ข้อมูลนี้</button>
-        </div>
+        <div class="text-xs font-bold text-[#9E7A3F]">TechTrade API</div>
+        <div id="trade-api-info" class="text-[10px] text-gray-500 mt-0.5">กำลังโหลด…</div>
+        <button type="button" onclick="reloadTradeApi()" class="w-full mt-2.5 text-[10px] font-bold rounded-lg py-1.5 bg-[#1F3B2D] text-white hover:opacity-90 transition-opacity">รีเฟรชจาก API</button>
       </div>
-      <!-- File upload drop zone (shown when no API data or user chose file) -->
-      <div id="drop-trade-wrap">
-        <div id="drop-trade"
-          class="drop-zone bg-white rounded-2xl shadow-card border-2 border-dashed border-gray-200 p-6 text-center cursor-pointer transition-all hover:border-[#C8A96B] hover:bg-[#FDF9F0]"
-          onclick="document.getElementById('input-trade').click()"
-          ondragover="onDragOver(event,'drop-trade')" ondragleave="onDragLeave('drop-trade')" ondrop="onDrop(event,'trade')">
-          <div class="text-3xl mb-2">🔄</div>
-          <div class="text-sm font-semibold text-gray-700 mb-0.5">คลิกหรือลากไฟล์มาวาง</div>
-          <div class="text-xs text-gray-400">trade_report / trade_search · หลายไฟล์ได้</div>
-        </div>
-        <div id="trade-file-list" class="hidden mt-2 space-y-1"></div>
-        <button id="trade-add-btn" class="hidden w-full mt-2 text-xs font-semibold text-[#9E7A3F] border border-dashed border-[#C8A96B] rounded-xl py-1.5 hover:bg-[#FDF6E8] transition-all" onclick="document.getElementById('input-trade').click()">+ เพิ่มไฟล์เทรด</button>
-      </div>
-      <input type="file" id="input-trade" accept=".xlsx,.xls" class="hidden" multiple onchange="onFileSelect(event,'trade')">
     </div>
 
     <!-- File 3: ASM mapping (optional) -->
@@ -125,7 +107,7 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
   </button>
 
   <div id="trade-hint" class="hidden mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-center">
-    📂 กรุณาอัปโหลด<strong>ไฟล์รายงานเทรด</strong> (ช่องที่ 2) เพื่อเปิดใช้ปุ่มประมวลผล
+    📂 กรุณาอัปโหลด<strong>ไฟล์ยอดขาย</strong> (ช่องที่ 1) เพื่อเปิดใช้ปุ่มประมวลผล — ข้อมูลเทรดดึงจาก API อัตโนมัติ
   </div>
 
   <div id="upload-error" class="hidden mt-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-5 py-3"></div>
@@ -468,16 +450,15 @@ const BRANCH_COLORS = [
   {from:'from-[#1e3a8a]',to:'to-[#60a5fa]',icon:'🏪'},
 ];
 
-let DATA = null, fileSales = [], fileTrade = [], fileASM = null, DATA_MONTHS = '';
+let DATA = null, fileSales = [], fileASM = null, DATA_MONTHS = '';
 let RAW_SALES_ROWS = [], RAW_TRADE_ROWS = [], SALES_COL_KEYS = null;
 let DRILL_BRANCH = null;
 let SELECTED_BRANCHES = new Set();
 let DATE_RANGE_START = null;
 let DATE_RANGE_END = null;
-let TRADE_API_MODE = false;    // true = ใช้ข้อมูลเทรดจาก API แทนไฟล์
-let TRADE_API_INFO = null;     // { rowCount, dateRange } จาก /api/import/trade-rows
+let TRADE_API_INFO = null;     // { rowCount, dateRange } จากสรุป API
 
-// ===== HYBRID TRADE MODE =====
+// ===== TRADE API (TechTrade) =====
 function checkProcessReady(){
   const btn = document.getElementById('process-btn');
   const hint = document.getElementById('trade-hint');
@@ -489,42 +470,22 @@ function checkProcessReady(){
     hint.classList.add('hidden');
   }
 }
-function setTradeApiMode(on){
-  TRADE_API_MODE = on;
-  // Toggle UI: API card active state vs file drop zone
-  const onBtn = document.getElementById('trade-api-on');
-  const offBtn = document.getElementById('trade-api-off');
-  const wrap = document.getElementById('drop-trade-wrap');
-  if(on){
-    onBtn.classList.add('ring-2','ring-[#1F3B2D]');
-    offBtn.classList.remove('ring-2','ring-[#1F3B2D]');
-    wrap.classList.add('opacity-30','pointer-events-none');
-    fileTrade = []; renderFileList('trade');
-  } else {
-    onBtn.classList.remove('ring-2','ring-[#1F3B2D]');
-    offBtn.classList.add('ring-2','ring-[#1F3B2D]');
-    wrap.classList.remove('opacity-30','pointer-events-none');
-  }
-  checkProcessReady();
-}
 async function initTradeApiCard(){
+  const info = document.getElementById('trade-api-info');
   try{
-    const r = await fetch('/api/import/trade-rows');
-    if(!r.ok) return;
+    const r = await fetch('/api/trade-stats');
+    if(!r.ok){ if(info) info.textContent = 'สถิติ API ไม่พร้อม (' + r.status + ')'; return; }
     const d = await r.json();
-    if(!d.rowCount) return;
-    TRADE_API_INFO = d;
-    const card = document.getElementById('trade-api-card');
-    card.classList.remove('hidden');
-    const info = document.getElementById('trade-api-info');
-    const fr = d.dateRange?.from ? new Date(d.dateRange.from) : null;
-    const to = d.dateRange?.to   ? new Date(d.dateRange.to)   : null;
-    const fmt = dt => dt ? `${dt.getDate()}/${dt.getMonth()+1}/${dt.getFullYear()+543}` : '';
-    info.textContent = `${d.rowCount.toLocaleString()} รายการ · ${fr?fmt(fr):''}${to&&fr&&fmt(to)!==fmt(fr)?' – '+fmt(to):''}`;
-    setTradeApiMode(true); // default เลือก API mode ถ้ามีข้อมูล
-  } catch(e){}
+    if(!d.success || !Array.isArray(d.stats)){ if(info) info.textContent = 'รูปแบบข้อมูล API ไม่ถูกต้อง'; return; }
+    const total = d.stats.reduce((s, x) => s + (parseInt(x.total_trades, 10) || 0), 0);
+    const dates = d.stats.map(x => x.last_updated).filter(Boolean).sort();
+    const last = dates.length ? dates[dates.length - 1] : '';
+    TRADE_API_INFO = { rowCount: total, dateRange: { from: last, to: last } };
+    if(info) info.textContent = total.toLocaleString() + ' รายการในระบบ' + (last ? ' · อัปเดต ' + last : '');
+  } catch(e){
+    if(info) info.textContent = 'เชื่อมต่อ API ไม่สำเร็จ: ' + (e?.message || String(e));
+  }
 }
-// เรียกตอนหน้าเว็บโหลด
 document.addEventListener('DOMContentLoaded', ()=>{ initTradeApiCard(); });
 
 // ปิด branch dropdown เมื่อคลิกนอก
@@ -540,12 +501,12 @@ function onDrop(e,type){ e.preventDefault(); onDragLeave('drop-'+type); Array.fr
 function onFileSelect(e,type){ Array.from(e.target.files||[]).forEach(f=>handleFile(f,type)); e.target.value=''; }
 
 function renderFileList(type){
-  const files=type==='sales'?fileSales:fileTrade;
+  if(type !== 'sales') return;
+  const files=fileSales;
   const listEl=document.getElementById(type+'-file-list');
   const addBtn=document.getElementById(type+'-add-btn');
-  const color=type==='sales'?'#1F3B2D':'#9E7A3F';
-  const bg=type==='sales'?'#E8F5EE':'#FDF6E8';
-  const border=type==='sales'?'#1F3B2D':'#C8A96B';
+  const color='#1F3B2D';
+  const bg='#E8F5EE';
   if(files.length===0){ listEl.classList.add('hidden'); addBtn.classList.add('hidden'); return; }
   listEl.innerHTML=files.map((f,i)=>`<div class="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold" style="background:${bg};color:${color}"><span class="truncate flex-1">📄 ${f.name}</span><button onclick="removeFile('${type}',${i})" class="shrink-0 hover:opacity-60 font-bold text-base leading-none ml-1">×</button></div>`).join('');
   listEl.classList.remove('hidden');
@@ -553,7 +514,6 @@ function renderFileList(type){
 }
 function removeFile(type,idx){
   if(type==='sales') fileSales.splice(idx,1);
-  else fileTrade.splice(idx,1);
   renderFileList(type);
   checkProcessReady();
 }
@@ -561,23 +521,72 @@ function handleFile(file, type){
   if(type==='sales'){
     fileSales.push(file);
     renderFileList('sales');
-  } else if(type==='trade'){
-    fileTrade.push(file);
-    renderFileList('trade');
-    // เมื่อเลือกไฟล์เทรด ให้ปิด API mode อัตโนมัติ
-    if(TRADE_API_MODE) setTradeApiMode(false);
   } else if(type==='asm'){
     fileASM=file; mark('asm-filename','👥 '+file.name,'text-sky-700','bg-sky-50');
   }
   checkProcessReady();
 }
-function mark(id, text, textCls, bgCls){
-  const el=document.getElementById(id);
-  el.textContent=text; el.className=`mt-3 text-xs font-semibold rounded-xl px-3 py-1.5 ${textCls} ${bgCls}`;
-  el.classList.remove('hidden');
+async function fetchTradeApiRows(){
+  const url = new URL('/api/trade-rows', window.location.origin);
+  const today = new Date();
+  const end = today.toISOString().slice(0,10);
+  const startDate = new Date(today);
+  startDate.setMonth(startDate.getMonth() - 12);
+  const start = startDate.toISOString().slice(0,10);
+  url.searchParams.set('start_date', start);
+  url.searchParams.set('end_date', end);
+  url.searchParams.set('limit', '5000');
+
+  const resp = await fetch(url.toString());
+  if (!resp.ok) throw new Error('โหลดข้อมูลเทรดจาก API ไม่สำเร็จ (' + resp.status + ')');
+  const json = await resp.json();
+  if (!json || json.success === false) throw new Error('API ตอบกลับไม่ถูกต้อง');
+  return json.data || [];
+}
+function mapTradeApiToRows(trades){
+  return trades.map(function(t){
+    var rid = t.real_branch_id != null ? String(t.real_branch_id) : '';
+    var bid = t.branch_id != null ? String(parseInt(String(t.branch_id), 10) || '') : '';
+    var code = rid ? String(parseInt(rid, 10) || '') : bid;
+    var bst = 0;
+    if(t.BIDDING_STATUS != null && t.BIDDING_STATUS !== '') bst = Number(t.BIDDING_STATUS) || 0;
+    else bst = Number(t.status) || 0;
+    return {
+      'trade_in_id': t.trade_in_id,
+      'real_branch_id': rid,
+      'document_no': t.document_no || t.invoice_no || '',
+      'invoice_no': String(t.invoice_no != null ? t.invoice_no : '').trim(),
+      'document_date': t.document_date || '',
+      'net_price': t.net_price != null ? Number(t.net_price) : 0,
+      'series': t.series || t.category_name || '',
+      'ชื่อสาขา': t.branch_name || '',
+      'branch_code': code,
+      'วันที่คำสั่งเทรด': t.document_date || '',
+      'BIDDING_STATUS': bst,
+      'สถานะ': t.BIDDING_STATUS_NAME || '',
+      'รหัสพนักงานขาย': String(t.SALE_CODE || t.sale_code || ''),
+      'ชื่อพนักงานขาย': t.SALE_NAME || t.sale_name || t.employee_name || '',
+    };
+  });
+}
+async function reloadTradeApi(){
+  const info = document.getElementById('trade-api-info');
+  try{
+    if(info) info.textContent = 'กำลังดึงข้อมูลจาก API...';
+    const trades = await fetchTradeApiRows();
+    const rows = mapTradeApiToRows(trades);
+    const dates = rows.map(function(r){ return r['วันที่คำสั่งเทรด']; }).filter(Boolean).sort();
+    TRADE_API_INFO = { rowCount: rows.length, dateRange: { from: dates[0] || '', to: dates[dates.length - 1] || '' } };
+    if(info) info.textContent = rows.length.toLocaleString() + ' รายการ (ดึงล่าสุด)';
+    RAW_TRADE_ROWS = rows;
+    checkProcessReady();
+    return rows;
+  } catch (err) {
+    if(info) info.textContent = 'โหลด API ไม่สำเร็จ: ' + (err?.message || String(err));
+    throw err;
+  }
 }
 
-// ===== PARSE =====
 function readXlsx(file){
   return new Promise((res,rej)=>{
     const r=new FileReader();
@@ -822,23 +831,11 @@ async function processFiles(){
   document.getElementById('loading').classList.remove('hidden');
   _normCache.clear(); _matchCache.clear(); _branchLookup=null; _branchLookupKeys=null;
   try{
-    document.getElementById('loading-msg').textContent='กำลังอ่านไฟล์ทั้งหมด…';
-    let tRows;
-    if(TRADE_API_MODE){
-      // Hybrid mode: fetch trade rows from API (no file needed)
-      document.getElementById('loading-msg').textContent='กำลังดึงข้อมูลเทรดจาก API…';
-      const apiResp = await fetch('/api/import/trade-rows');
-      if(!apiResp.ok) throw new Error(`API trade-rows error: ${apiResp.status}`);
-      const apiData = await apiResp.json();
-      tRows = apiData.rows || [];
-    } else if(fileTrade.length > 0){
-      const tradeFileRows = await Promise.all(fileTrade.map(readXlsx));
-      const tradeFormat0 = detectTradeFormat(tradeFileRows[0] || []);
-      tRows = tradeFormat0 === 'search' ? tradeFileRows.flat() : tradeFileRows[0] || [];
-    } else {
-      // ไม่มีข้อมูลเทรด (Vercel mode / sales-only) → ใช้อาร์เรย์ว่าง
-      tRows = [];
-    }
+    document.getElementById('loading-msg').textContent='กำลังดึงข้อมูลเทรดจาก API…';
+    const trades = await fetchTradeApiRows();
+    const tRows = mapTradeApiToRows(trades);
+    const tradeFormat0 = 'search';
+    const tradeFileRows = [];
     const [sRows, asmRows] = await Promise.all([
       Promise.all(fileSales.map(readXlsx)).then(arrs => arrs.flat()),
       fileASM ? readXlsx(fileASM) : Promise.resolve(null)
@@ -915,9 +912,11 @@ async function processFiles(){
     const salesKeys=Object.keys(salesByBranch);
     const tradeFormat=tradeFormat0;
     let tradeSummary={}, byEmpTrade={};
-    // คอลัม IT (index 253, 0-based) ในไฟล์เทรด = เลขที่บิลขาย สำหรับ lookup billToEmp
+    // เลขบิลขาย → lookup billToEmp จากคอลัมน์ Q ของไฟล์ยอดขาย
+    // ไฟล์เทรด Excel: คอลัม IT (index 253) | แถวจาก API: ใช้ invoice_no ก่อน (ตรงกับเลขบิลในระบบขาย)
     const tKeys=tRows.length>0?Object.keys(tRows[0]):[];
-    const tBillCol=tKeys.length>253?tKeys[253]:null;
+    let tBillCol=tKeys.length>253?tKeys[253]:null;
+    if(!tBillCol&&tKeys.includes('invoice_no'))tBillCol='invoice_no';
 
     if(tradeFormat==='search'){
       // activeDates สร้างแล้วใน PASS 1 — ใช้ได้เลย
@@ -1242,22 +1241,17 @@ function resetAMRM(){
 }
 
 function resetDashboard(){
-  DATA=null; fileSales=[]; fileTrade=[]; fileASM=null; DATA_MONTHS='';
+  DATA=null; fileSales=[]; fileASM=null; DATA_MONTHS='';
   RAW_SALES_ROWS=[]; RAW_TRADE_ROWS=[]; SALES_COL_KEYS=null;
   DATE_RANGE_START=null; DATE_RANGE_END=null;
-  TRADE_API_MODE=false; TRADE_API_INFO=null;
+  TRADE_API_INFO=null;
   document.getElementById('dashboard-screen').classList.add('hidden');
   document.getElementById('upload-screen').classList.remove('hidden');
   document.getElementById('process-btn').classList.add('hidden');
-  ['input-sales','input-trade','input-asm'].forEach(id=>{ document.getElementById(id).value=''; });
-  ['sales-file-list','trade-file-list','sales-add-btn','trade-add-btn','asm-filename'].forEach(id=>{ document.getElementById(id)?.classList.add('hidden'); });
-  // reset trade API card state
-  document.getElementById('trade-api-card').classList.add('hidden');
-  const wrap=document.getElementById('drop-trade-wrap');
-  wrap.classList.remove('opacity-30','pointer-events-none');
+  ['input-sales','input-asm'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  ['sales-file-list','sales-add-btn','asm-filename'].forEach(id=>{ document.getElementById(id)?.classList.add('hidden'); });
   DEV_KEYS.forEach(d=>{ document.getElementById('dev-'+d).checked=true; });
   updateChips();
-  // re-check API trade availability
   initTradeApiCard();
 }
 
