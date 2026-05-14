@@ -479,17 +479,14 @@ let TRADE_API_INFO = null;     // { rowCount, dateRange } จาก /api/import/
 
 // ===== HYBRID TRADE MODE =====
 function checkProcessReady(){
-  const tradeReady = TRADE_API_MODE || fileTrade.length > 0;
   const btn = document.getElementById('process-btn');
   const hint = document.getElementById('trade-hint');
-  if(fileSales.length && tradeReady){
+  if(fileSales.length){
     btn.classList.remove('hidden');
     hint.classList.add('hidden');
   } else {
     btn.classList.add('hidden');
-    // แสดง hint เฉพาะเมื่ออัปโหลดไฟล์ยอดขายแล้วแต่ยังไม่มีข้อมูลเทรด
-    if(fileSales.length && !tradeReady) hint.classList.remove('hidden');
-    else hint.classList.add('hidden');
+    hint.classList.add('hidden');
   }
 }
 function setTradeApiMode(on){
@@ -834,10 +831,13 @@ async function processFiles(){
       if(!apiResp.ok) throw new Error(`API trade-rows error: ${apiResp.status}`);
       const apiData = await apiResp.json();
       tRows = apiData.rows || [];
-    } else {
+    } else if(fileTrade.length > 0){
       const tradeFileRows = await Promise.all(fileTrade.map(readXlsx));
       const tradeFormat0 = detectTradeFormat(tradeFileRows[0] || []);
       tRows = tradeFormat0 === 'search' ? tradeFileRows.flat() : tradeFileRows[0] || [];
+    } else {
+      // ไม่มีข้อมูลเทรด (Vercel mode / sales-only) → ใช้อาร์เรย์ว่าง
+      tRows = [];
     }
     const [sRows, asmRows] = await Promise.all([
       Promise.all(fileSales.map(readXlsx)).then(arrs => arrs.flat()),
