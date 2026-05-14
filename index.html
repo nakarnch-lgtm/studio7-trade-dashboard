@@ -526,16 +526,63 @@ function handleFile(file, type){
   }
   checkProcessReady();
 }
-async function fetchTradeApiRows(){
+/** จาก activeDates (DD/MM/YYYY CE) ในไฟล์ขาย → ช่วง ISO สำหรับ query API + buffer วันละรอบเทรด */
+function isoDateRangeFromSalesActiveDates(activeDates){
+  if(!activeDates||activeDates.size===0) return null;
+  var minT=Infinity, maxT=-Infinity;
+  activeDates.forEach(function(ds){
+    var m=String(ds).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if(!m) return;
+    var t=new Date(parseInt(m[3],10), parseInt(m[2],10)-1, parseInt(m[1],10)).getTime();
+    if(t<minT) minT=t;
+    if(t>maxT) maxT=t;
+  });
+  if(!isFinite(minT)) return null;
+  var PAD_MS=14*86400000;
+  var start=new Date(minT-PAD_MS);
+  var endMs=Math.min(maxT+PAD_MS, Date.now());
+  var end=new Date(endMs);
+  if(start>end){ var x=start; start=end; end=x; }
+  return { start:start.toISOString().slice(0,10), end:end.toISOString().slice(0,10) };
+}
+/** limit ตามความยาวช่วงวันที่ (ไม่ดึงเกินจำเป็นโดยไม่จำเป็น) */
+function tradeApiLimitForIsoRange(startIso, endIso){
+  var a=new Date(startIso).getTime(), b=new Date(endIso).getTime();
+  var days=Math.max(1, Math.ceil((b-a)/86400000));
+  return String(Math.min(50000, Math.max(800, days*150)));
+}
+/** กรองแถวเทรดจาก API ให้เหลือเฉพาะสาขาที่มีในไฟล์ขาย (ตามรหัสสาขา) — ลดข้อมูลก่อน parseTradeSearch */
+function filterTradeRowsBySalesBranchIds(rows, salesBranchIdMap){
+  var idSet=new Set(Object.keys(salesBranchIdMap));
+  if(idSet.size===0) return rows;
+  return rows.filter(function(r){
+    var bc=s(r['branch_code']||r['real_branch_id']||'');
+    var id=bc?String(parseInt(bc,10)||''):'';
+    if(!id||id==='0') return true;
+    return idSet.has(id);
+  });
+}
+/**
+ * @param {string|null} startIso - YYYY-MM-DD หรือ null = default 12 เดือนล่าสุด
+ * @param {string|null} endIso
+ * @param {string|null} limitStr
+ */
+async function fetchTradeApiRows(startIso, endIso, limitStr){
   const url = new URL('/api/trade-rows', window.location.origin);
   const today = new Date();
-  const end = today.toISOString().slice(0,10);
-  const startDate = new Date(today);
-  startDate.setMonth(startDate.getMonth() - 12);
-  const start = startDate.toISOString().slice(0,10);
+  var end = endIso || today.toISOString().slice(0,10);
+  var start;
+  if(startIso&&endIso){
+    start=startIso;
+    if(new Date(start)>new Date(end)){ var sw=start; start=end; end=sw; }
+  } else {
+    var startDate=new Date(today);
+    startDate.setMonth(startDate.getMonth()-12);
+    start=startDate.toISOString().slice(0,10);
+  }
   url.searchParams.set('start_date', start);
   url.searchParams.set('end_date', end);
-  url.searchParams.set('limit', '5000');
+  url.searchParams.set('limit', limitStr||'5000');
 
   const resp = await fetch(url.toString());
   if (!resp.ok) throw new Error('โหลดข้อมูลเทรดจาก API ไม่สำเร็จ (' + resp.status + ')');
@@ -831,16 +878,12 @@ async function processFiles(){
   document.getElementById('loading').classList.remove('hidden');
   _normCache.clear(); _matchCache.clear(); _branchLookup=null; _branchLookupKeys=null;
   try{
-    document.getElementById('loading-msg').textContent='กำลังดึงข้อมูลเทรดจาก API…';
-    const trades = await fetchTradeApiRows();
-    const tRows = mapTradeApiToRows(trades);
-    const tradeFormat0 = 'search';
-    const tradeFileRows = [];
+    document.getElementById('loading-msg').textContent='กำลังอ่านไฟล์ยอดขาย…';
     const [sRows, asmRows] = await Promise.all([
       Promise.all(fileSales.map(readXlsx)).then(arrs => arrs.flat()),
       fileASM ? readXlsx(fileASM) : Promise.resolve(null)
     ]);
-    document.getElementById('loading-msg').textContent='กำลังประมวลผลข้อมูล…';
+    document.getElementById('loading-msg').textContent='กำลังวิเคราะห์ช่วงวันที่และสาขาจากไฟล์ขาย…';
 
     const sS=sRows[0]||{};
     const kBranch  =findCol(sS,['Branch (Name)','Branch']);
@@ -907,6 +950,14 @@ async function processFiles(){
       }
       if(!salesEmpBranch[oid])salesEmpBranch[oid]=(bid&&bid!=='0'&&salesBranchIdMap[bid])?salesBranchIdMap[bid]:branch;
     });
+
+    document.getElementById('loading-msg').textContent='กำลังดึงข้อมูลเทรดจาก API (ตามช่วงวันที่ในไฟล์ขาย)…';
+    var isoRange=isoDateRangeFromSalesActiveDates(activeDates);
+    var limitStr=isoRange?tradeApiLimitForIsoRange(isoRange.start, isoRange.end):'5000';
+    var trades=await fetchTradeApiRows(isoRange&&isoRange.start, isoRange&&isoRange.end, limitStr);
+    var tRows=filterTradeRowsBySalesBranchIds(mapTradeApiToRows(trades), salesBranchIdMap);
+    const tradeFormat0='search';
+    const tradeFileRows=[];
 
     const THAI_MTH=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     const salesKeys=Object.keys(salesByBranch);
