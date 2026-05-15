@@ -575,15 +575,6 @@ function expandActiveDatesHull(activeDates){
   }
   return out;
 }
-// #region agent log
-function __agentDbg(payload){
-  var o=Object.assign({sessionId:'6b2706',timestamp:Date.now(),runId:'post-fix'},payload);
-  var body=JSON.stringify(o);
-  fetch('http://127.0.0.1:7824/ingest/6bbb6109-64c3-4b3c-84e9-2d6d35074ef7',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'6b2706'},body:body}).catch(function(){});
-  var base=(typeof location!=='undefined'&&location.origin)?location.origin:'';
-  fetch(base+'/api/debug-log',{method:'POST',headers:{'Content-Type':'application/json'},body:body}).catch(function(){ try{ console.warn('[AGENT_DEBUG_6b2706]',body); }catch(e){} });
-}
-// #endregion
 /**
  * @param {string|null} startIso - YYYY-MM-DD หรือ null = default 12 เดือนล่าสุด
  * @param {string|null} endIso
@@ -610,10 +601,6 @@ async function fetchTradeApiRows(startIso, endIso, limitStr){
   if (!resp.ok) throw new Error('โหลดข้อมูลเทรดจาก API ไม่สำเร็จ (' + resp.status + ')');
   const json = await resp.json();
   if (!json || json.success === false) throw new Error('API ตอบกลับไม่ถูกต้อง');
-  // #region agent log
-  var _d=json.data||[];
-  __agentDbg({location:'index.html:fetchTradeApiRows',message:'trade API response',hypothesisId:'H1',data:{startIso:start,endIso:end,limit:url.searchParams.get('limit'),jsonCount:json.count,dataLen:_d.length,truncationSuspect:!!(json.count&&_d.length&&Number(json.count)===_d.length&&_d.length>=50000)}});
-  // #endregion
   return json.data || [];
 }
 function mapTradeApiToRows(trades){
@@ -896,8 +883,19 @@ function parseTradeSearch(rows, activeDates, salesKeys, empNameMap={}, salesBran
 
     if(empId){
       if(!byEmp[empId])byEmp[empId]={name:displayName,nameFromSales:!!billMatch,branch:empBranch,agreed:0,evaluated:0};
+      else if(billMatch&&billMatch.name) byEmp[empId].name=billMatch.name;
       byEmp[empId].evaluated++;
-      if(agreed)byEmp[empId].agreed++;
+    }
+    // ตกลงเทรด → รหัส/ชื่อพนักงานจากไฟล์ยอดขาย (จับคู่เลขบิล) เท่านั้น
+    if(agreed&&billMatch){
+      const saleEmpId=billMatch.empId;
+      const saleName=billMatch.name||empNameMap[saleEmpId]||'';
+      const empKey=saleEmpId||billNo;
+      if(empKey){
+        if(!byEmp[empKey])byEmp[empKey]={name:saleName,nameFromSales:true,branch:billMatch.branch||branch,agreed:0,evaluated:0};
+        else if(saleName) byEmp[empKey].name=saleName;
+        byEmp[empKey].agreed++;
+      }
     }
   });
   return {summary,byEmp};
@@ -954,14 +952,23 @@ async function processFiles(){
         const _bn=shortBranch(s(r[kBranch]));
         if(_bn&&_bn!=='Unknown')salesBranchIdMap[_bid]=_bn;
       }
-      if(r[kPType]!=='Inventory Item')return;
       const bid=_bid;
       const branch=(bid&&bid!=='0'&&salesBranchIdMap[bid])?salesBranchIdMap[bid]:shortBranch(s(r[kBranch]));
+      // เลขบิลจากทุกแถวในไฟล์ขาย (ไม่จำกัดแค่ Inventory Item) สำหรับจับคู่ตกลงเทรด
       if(sBillCol){
         const bill=normBill(r[sBillCol]);
-        if(bill&&!billToEmp[bill])
-          billToEmp[bill]={empId:oid||'',name:oid?(empNameMap[oid]||s(r[kOffName]||'')):'',branch};
+        if(bill){
+          const nm=s(r[kOffName])||'';
+          const prev=billToEmp[bill];
+          if(!prev){
+            billToEmp[bill]={empId:oid||'',name:nm,branch};
+          } else {
+            if(oid) prev.empId=oid;
+            if(nm) prev.name=nm;
+          }
+        }
       }
+      if(r[kPType]!=='Inventory Item')return;
       const qty=Number(r[kQty])||0; if(qty<=0)return;
       const dev=CAT_DEV[s(r[kCat])]; if(!dev)return;
       if(!salesByBranch[branch])salesByBranch[branch]={};
@@ -983,33 +990,11 @@ async function processFiles(){
       if(!salesEmpBranch[oid])salesEmpBranch[oid]=(bid&&bid!=='0'&&salesBranchIdMap[bid])?salesBranchIdMap[bid]:branch;
     });
 
-    // #region agent log
-    (function(){
-      var ad=[...activeDates].sort();
-      __agentDbg({location:'index.html:processFiles:afterSalesPass',message:'sales scope for trade',hypothesisId:'H5',data:{salesRowCount:sRows.length,activeDatesSize:activeDates.size,activeDatesSample:ad.slice(0,3).concat(ad.slice(-2)),salesBranchIdMapSize:Object.keys(salesBranchIdMap).length}});
-    })();
-    // #endregion
-
     document.getElementById('loading-msg').textContent='กำลังดึงข้อมูลเทรดจาก API (ตามช่วงวันที่ในไฟล์ขาย)…';
     var isoRange=isoDateRangeFromSalesActiveDates(activeDates);
     var limitStr=isoRange?tradeApiLimitForIsoRange(isoRange.start, isoRange.end):'50000';
-    // #region agent log
-    __agentDbg({location:'index.html:processFiles:apiQuery',message:'trade API query params',hypothesisId:'H1',data:{isoRange:isoRange,limitStr:limitStr}});
-    // #endregion
     var trades=await fetchTradeApiRows(isoRange&&isoRange.start, isoRange&&isoRange.end, limitStr);
     var tRows=mapTradeApiToRows(trades);
-    // #region agent log
-    (function(){
-      var THK={'สิ้นสุดการประเมินราคา':1,'ยืนยันราคาแล้ว':1,'ยกเลิกรายการ':1,'รอผู้ขายยืนยันราคา':1,'รอการประเมินราคา':1,'อยู่ระหว่างผู้รับซื้อให้ราคา':1,'กำลังสร้างเอกสาร':1};
-      var unk={}, freq={};
-      tRows.forEach(function(r){
-        var st=s(r['สถานะ']||'').replace(/\s+/g,' ').trim();
-        if(st){ freq[st]=(freq[st]||0)+1; if(!THK[st]) unk[st]=(unk[st]||0)+1; }
-      });
-      var westRaw=tRows.filter(function(r){ return /westgate/i.test(s(r['ชื่อสาขา']||'')); }).length;
-      __agentDbg({location:'index.html:processFiles:afterMap',message:'mapped trade rows + status strings',hypothesisId:'H4',data:{tRowsLen:tRows.length,westgateRowHint:westRaw,statusTop:Object.entries(freq).sort(function(a,b){return b[1]-a[1];}).slice(0,8),unknownStatusKeys:Object.keys(unk)}});
-    })();
-    // #endregion
     const tradeFormat0='search';
     const tradeFileRows=[];
 
@@ -1026,12 +1011,6 @@ async function processFiles(){
     if(tradeFormat==='search'){
       // ใช้ hull วันที่ระหว่าง min–max จากไฟล์ขาย (ไม่ใช่แค่วันที่มีบรรทัดขาย) เพื่อไม่ตัด trade วันที่ไม่มี sale line
       const tradeActiveDates=expandActiveDatesHull(activeDates);
-      // #region agent log
-      (function(){
-        var td=[...tradeActiveDates].sort();
-        __agentDbg({location:'index.html:processFiles:dateHull',message:'trade date filter sets',hypothesisId:'H2',data:{activeDatesOrig:activeDates.size,hullSize:tradeActiveDates.size,hullSample:td.slice(0,2).concat(td.slice(-1))}});
-      })();
-      // #endregion
       // กรองตามวันที่ขาย Device; ถ้าไม่มี overlap ให้ fallback แสดงข้อมูลทั้งหมด
       let result=parseTradeSearch(tRows,tradeActiveDates,salesKeys,empNameMap,salesBranchIdMap,billToEmp,tBillCol);
       const totalFiltered=Object.values(result.summary).reduce((s,v)=>s+v.evaluated,0);
@@ -1043,14 +1022,6 @@ async function processFiles(){
       }
       tradeSummary=result.summary;
       byEmpTrade=result.byEmp;
-      // #region agent log
-      (function(){
-        var te=0,ta=0; Object.values(tradeSummary).forEach(function(v){ te+=v.evaluated||0; ta+=v.agreed||0; });
-        var wk=Object.keys(tradeSummary).filter(function(k){ return /westgate/i.test(k); });
-        var we=0,wa=0; wk.forEach(function(k){ we+=tradeSummary[k].evaluated||0; wa+=tradeSummary[k].agreed||0; });
-        __agentDbg({location:'index.html:processFiles:afterParseTrade',message:'tradeSummary totals',hypothesisId:'H3',data:{dateFiltered:dateFiltered,totalFiltered:totalFiltered,sumEvaluated:te,sumAgreed:ta,branchKeys:Object.keys(tradeSummary).length,westgateKeys:wk,westgateEval:we,westgateAgreed:wa}});
-      })();
-      // #endregion
 
       // Build date badges
       const sdArr=[...activeDates].sort();
@@ -1170,13 +1141,21 @@ async function processFiles(){
         tradeByYm[branch][ym].evaluated++;
         const _billNo=tradeBillNo(r,tBillCol);
         const _billM=_billNo?billToEmp[_billNo]:null;
-        if(isAgreedTrade(r,billToEmp,tBillCol))tradeByYm[branch][ym].agreed++;
-        const _eid=_billM?_billM.empId:s(r['รหัสพนักงานขาย']||'');
-        if(_eid){
-          if(!byEmpYm[_eid])byEmpYm[_eid]={};
-          if(!byEmpYm[_eid][ym])byEmpYm[_eid][ym]={agreed:0,evaluated:0};
-          byEmpYm[_eid][ym].evaluated++;
-          if(isAgreedTrade(r,billToEmp,tBillCol))byEmpYm[_eid][ym].agreed++;
+        const _agreed=isAgreedTrade(r,billToEmp,tBillCol);
+        if(_agreed)tradeByYm[branch][ym].agreed++;
+        const _eidEval=_billM?_billM.empId:s(r['รหัสพนักงานขาย']||'');
+        if(_eidEval){
+          if(!byEmpYm[_eidEval])byEmpYm[_eidEval]={};
+          if(!byEmpYm[_eidEval][ym])byEmpYm[_eidEval][ym]={agreed:0,evaluated:0};
+          byEmpYm[_eidEval][ym].evaluated++;
+        }
+        if(_agreed&&_billM){
+          const _saleId=_billM.empId||_billNo;
+          if(_saleId){
+            if(!byEmpYm[_saleId])byEmpYm[_saleId]={};
+            if(!byEmpYm[_saleId][ym])byEmpYm[_saleId][ym]={agreed:0,evaluated:0};
+            byEmpYm[_saleId][ym].agreed++;
+          }
         }
       });
     } else {
