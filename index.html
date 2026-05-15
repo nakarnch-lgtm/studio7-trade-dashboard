@@ -78,7 +78,8 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
         <div class="text-2xl mb-1">🔗</div>
         <div class="text-xs font-bold text-[#9E7A3F]">TechTrade API</div>
         <div id="trade-api-info" class="text-[10px] text-gray-500 mt-0.5">กำลังโหลด…</div>
-        <button type="button" onclick="reloadTradeApi()" class="w-full mt-2.5 text-[10px] font-bold rounded-lg py-1.5 bg-[#1F3B2D] text-white hover:opacity-90 transition-opacity">รีเฟรชจาก API</button>
+        <button type="button" onclick="reloadTradeApi()" class="w-full mt-2.5 text-[10px] font-bold rounded-lg py-1.5 bg-[#1F3B2D] text-white hover:opacity-90 transition-opacity">รีเฟรชสถิติ API</button>
+        <p class="text-[9px] text-gray-400 mt-1 leading-snug px-1">ดึงตามช่วงวันที่ + รหัสสาขาในไฟล์ขาย (API branch)</p>
       </div>
     </div>
 
@@ -575,12 +576,19 @@ function expandActiveDatesHull(activeDates){
   }
   return out;
 }
+/** รหัสสาขาจากไฟล์ขาย → พารามิเตอร์ branch ของ API (เช่น "645,646") */
+function branchParamFromSalesMap(salesBranchIdMap){
+  var ids=Object.keys(salesBranchIdMap||{}).filter(function(id){ return id&&id!=='0'; });
+  if(!ids.length) return null;
+  return ids.join(',');
+}
 /**
  * @param {string|null} startIso - YYYY-MM-DD หรือ null = default 12 เดือนล่าสุด
  * @param {string|null} endIso
  * @param {string|null} limitStr
+ * @param {string|null} branchParam - รหัสสาขาคั่น comma ตาม API docs
  */
-async function fetchTradeApiRows(startIso, endIso, limitStr){
+async function fetchTradeApiRows(startIso, endIso, limitStr, branchParam){
   const url = new URL('/api/trade-rows', window.location.origin);
   const today = new Date();
   var end = endIso || today.toISOString().slice(0,10);
@@ -596,6 +604,7 @@ async function fetchTradeApiRows(startIso, endIso, limitStr){
   url.searchParams.set('start_date', start);
   url.searchParams.set('end_date', end);
   url.searchParams.set('limit', limitStr||'50000');
+  if(branchParam) url.searchParams.set('branch', branchParam);
 
   const resp = await fetch(url.toString());
   if (!resp.ok) throw new Error('โหลดข้อมูลเทรดจาก API ไม่สำเร็จ (' + resp.status + ')');
@@ -630,21 +639,26 @@ function mapTradeApiToRows(trades){
   });
 }
 async function reloadTradeApi(){
-  const info = document.getElementById('trade-api-info');
-  try{
-    if(info) info.textContent = 'กำลังดึงข้อมูลจาก API...';
-    const trades = await fetchTradeApiRows();
-    const rows = mapTradeApiToRows(trades);
-    const dates = rows.map(function(r){ return r['วันที่คำสั่งเทรด']; }).filter(Boolean).sort();
-    TRADE_API_INFO = { rowCount: rows.length, dateRange: { from: dates[0] || '', to: dates[dates.length - 1] || '' } };
-    if(info) info.textContent = rows.length.toLocaleString() + ' รายการ (ดึงล่าสุด)';
-    RAW_TRADE_ROWS = rows;
-    checkProcessReady();
-    return rows;
-  } catch (err) {
-    if(info) info.textContent = 'โหลด API ไม่สำเร็จ: ' + (err?.message || String(err));
-    throw err;
-  }
+  return initTradeApiCard();
+}
+/** สำรอง: กรองฝั่ง browser หาก API ไม่ส่ง branch หรือ mapping สาขาไม่ตรง */
+function filterTradesForSalesScope(trades, salesBranchIdMap, salesKeys){
+  var ids=Object.keys(salesBranchIdMap||{}).filter(function(id){ return id&&id!=='0'; });
+  if(ids.length===0&&(!salesKeys||!salesKeys.length)) return trades;
+  var idSet=new Set(ids);
+  var keySet=new Set(salesKeys||[]);
+  return trades.filter(function(t){
+    var rid=t.real_branch_id!=null?String(parseInt(String(t.real_branch_id),10)||''):'';
+    var bid=t.branch_id!=null?String(parseInt(String(t.branch_id),10)||''):'';
+    if(rid&&rid!=='0'&&idSet.has(rid)) return true;
+    if(bid&&bid!=='0'&&idSet.has(bid)) return true;
+    var raw=t.branch_name||'';
+    if(!raw) return false;
+    var bn=shortBranch(raw);
+    if(keySet.has(bn)) return true;
+    var matched=matchBranch(bn,salesKeys);
+    return !!(matched&&keySet.has(matched));
+  });
 }
 
 function readXlsx(file){
@@ -1059,16 +1073,24 @@ async function processFiles(){
       if(!salesEmpBranch[oid])salesEmpBranch[oid]=(bid&&bid!=='0'&&salesBranchIdMap[bid])?salesBranchIdMap[bid]:branch;
     });
 
-    document.getElementById('loading-msg').textContent='กำลังดึงข้อมูลเทรดจาก API (ตามช่วงวันที่ในไฟล์ขาย)…';
+    const salesKeys=Object.keys(salesByBranch);
+    const salesBranchCount=salesKeys.length;
+    var branchParam=branchParamFromSalesMap(salesBranchIdMap);
+    var branchIds=branchParam?branchParam.split(',').length:0;
+    document.getElementById('loading-msg').textContent='กำลังดึงข้อมูลเทรดจาก API'
+      +(branchIds?' (สาขา '+branchIds+' แห่ง)':'')
+      +' · ช่วงวันที่ในไฟล์ขาย…';
     var isoRange=isoDateRangeFromSalesActiveDates(activeDates);
     var limitStr=isoRange?tradeApiLimitForIsoRange(isoRange.start, isoRange.end):'50000';
-    var trades=await fetchTradeApiRows(isoRange&&isoRange.start, isoRange&&isoRange.end, limitStr);
+    var trades=await fetchTradeApiRows(isoRange&&isoRange.start, isoRange&&isoRange.end, limitStr, branchParam);
+    var apiFetched=trades.length;
+    trades=filterTradesForSalesScope(trades,salesBranchIdMap,salesKeys);
     var tRows=mapTradeApiToRows(trades);
+    TRADE_API_INFO={rowCount:tRows.length,apiFetched:apiFetched,salesBranches:salesBranchCount,branchFilter:!!branchParam};
     const tradeFormat0='search';
     const tradeFileRows=[];
 
     const THAI_MTH=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-    const salesKeys=Object.keys(salesByBranch);
     const tradeFormat=tradeFormat0;
     let tradeSummary={}, byEmpTrade={}, tradeByYm={}, byEmpYm={};
     // เลขบิลขาย → lookup billToEmp จากคอลัมน์ Q ของไฟล์ยอดขาย
@@ -1209,6 +1231,13 @@ async function processFiles(){
       has_amrm:hasAMRM,
       all_branch_names:allBranchNames
     };
+    var apiInfo=document.getElementById('trade-api-info');
+    if(apiInfo&&TRADE_API_INFO){
+      var msg=TRADE_API_INFO.rowCount.toLocaleString()+' รายการ';
+      if(TRADE_API_INFO.branchFilter) msg+=' · กรองสาขาใน API ('+TRADE_API_INFO.salesBranches+' สาขา)';
+      else msg+=' · ดึงจาก API '+TRADE_API_INFO.apiFetched.toLocaleString()+' รายการ';
+      apiInfo.textContent=msg;
+    }
     showDashboard();
   }catch(err){
     document.getElementById('loading').classList.add('hidden');

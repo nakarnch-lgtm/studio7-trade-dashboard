@@ -1,6 +1,6 @@
 /**
  * Proxy: TechTrade GET /api/v2/trades
- * Query params: zone, start_date, end_date, limit (forwarded upstream)
+ * Query params: zone, branch, start_date, end_date, limit (forwarded upstream)
  */
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -19,7 +19,7 @@ module.exports = async function handler(req, res) {
     const urlObj = new URL(req.url || "/", "http://" + host);
     const params = urlObj.searchParams;
     const target = new URL("https://report-trade.vercel.app/api/v2/trades");
-    ["zone", "start_date", "end_date", "limit"].forEach(function (k) {
+    ["zone", "branch", "start_date", "end_date", "limit"].forEach(function (k) {
       if (params.has(k)) target.searchParams.set(k, params.get(k));
     });
     var apiKey =
