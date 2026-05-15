@@ -1250,7 +1250,10 @@ async function processFiles(){
       emp_branch:salesEmpBranch,
       branch_amrm:branchAMRM,
       has_amrm:hasAMRM,
-      all_branch_names:allBranchNames
+      all_branch_names:allBranchNames,
+      sales_bill_ids:[...salesBillSet],
+      bill_to_emp:billToEmp,
+      t_bill_col:tBillCol
     };
     var apiInfo=document.getElementById('trade-api-info');
     if(apiInfo&&TRADE_API_INFO){
@@ -2119,10 +2122,11 @@ function renderEmpSummary(devs, amrmBranches){
     const perDev={};
     devs.forEach(d=>{ perDev[d]=sumEmpSales(empId,[d]); });
     const devSold=devs.reduce((s,d)=>s+perDev[d],0);
-    const {agreed,evaluated}=sumEmpTrade(empId);
+    const trade=sumEmpTrade(empId);
+    const agreed=trade.agreed, evaluated=trade.evaluated, notAgreed=trade.not_agreed||0;
     if(devSold<=0||evaluated<=0)return null;
     const attP=pct(agreed,devSold);
-    return{empId,name,branch,perDev,devSold,evaluated,agreed,attP};
+    return{empId,name,branch,perDev,devSold,evaluated,agreed,notAgreed,attP};
   }).filter(Boolean).sort((a,b)=>b.attP-a.attP||b.agreed-a.agreed||b.devSold-a.devSold);
 
   if(EMP_LIST_CACHE.length===0){
@@ -2170,7 +2174,7 @@ function renderEmpPage(page){
       </td>
       ${devCells}
       <td class="px-1 py-2 text-center text-sm font-bold text-[#9E7A3F]">${e.devSold||'–'}</td>
-      <td class="px-1 py-2 text-center text-sm font-semibold text-gray-500">${e.evaluated||'–'}</td>
+      <td class="px-1 py-2 text-center text-sm font-semibold text-gray-500" title="${e.notAgreed>0?'ยังไม่ตกลง '+e.notAgreed+' รายการ':''}">${e.evaluated||'–'}</td>
       <td class="px-1 py-2 text-center text-base font-black text-emerald-600">${e.agreed}</td>
       <td class="px-1 py-2 min-w-[90px]">
         <div class="flex items-center gap-1">
@@ -2431,16 +2435,49 @@ function sumEmpSales(empId,devs){
   }
   return devs.reduce((s,d)=>s+active.reduce((sum,ym)=>sum+(DATA.sales_by_emp_ym?.[id]?.[ym]?.[d]||0),0),0);
 }
+function tradeRowInActiveRange(r){
+  const active=getActiveYMs();
+  const all=DATA?.available_yms||[];
+  if(!DATE_RANGE_START&&!DATE_RANGE_END&&active.length===all.length) return true;
+  const ym=tradeRowYm(r);
+  return !!(ym&&active.indexOf(ym)>=0);
+}
+function empIdForTradeRow(r){
+  const billToEmp=DATA?.bill_to_emp||{};
+  const tBillCol=DATA?.t_bill_col||'invoice_no';
+  const cands=tradeBillCandidates(r,tBillCol);
+  for(var i=0;i<cands.length;i++){
+    var m=billToEmp[cands[i]];
+    if(m&&m.empId) return String(m.empId);
+  }
+  var api=s(r['รหัสพนักงานขาย']||'');
+  return api?String(api):'';
+}
+/** นับประเมิน/ตกลงต่อพนักงานจากแถว trade จริง (ตกลง = เลขบิลตรงไฟล์ขาย) */
+function calcEmpTradeStats(empId){
+  const id=String(empId);
+  const salesBillSet=new Set(DATA?.sales_bill_ids||[]);
+  const tBillCol=DATA?.t_bill_col||'invoice_no';
+  var evaluated=0, agreed=0;
+  (RAW_TRADE_ROWS||[]).forEach(function(r){
+    if(!tradeRowInActiveRange(r)) return;
+    if(empIdForTradeRow(r)!==id) return;
+    evaluated++;
+    if(isAgreedTrade(r,salesBillSet,tBillCol)) agreed++;
+  });
+  return{agreed:agreed,evaluated:evaluated,not_agreed:evaluated-agreed};
+}
 function sumEmpTrade(empId){
+  if(RAW_TRADE_ROWS&&RAW_TRADE_ROWS.length&&DATA) return calcEmpTradeStats(empId);
   const id=String(empId);
   const active=getActiveYMs();
   const all=DATA?.available_yms||[];
   if(!DATE_RANGE_START&&!DATE_RANGE_END&&active.length===all.length){
-    const t=DATA.by_emp[id]||{agreed:0,evaluated:0}; return{agreed:t.agreed,evaluated:t.evaluated};
+    const t=DATA.by_emp[id]||{agreed:0,evaluated:0}; return{agreed:t.agreed,evaluated:t.evaluated,not_agreed:(t.evaluated||0)-(t.agreed||0)};
   }
   let agreed=0,evaluated=0;
   active.forEach(ym=>{const t=DATA.by_emp_ym?.[id]?.[ym]||{};agreed+=(t.agreed||0);evaluated+=(t.evaluated||0);});
-  return{agreed,evaluated};
+  return{agreed,evaluated,not_agreed:evaluated-agreed};
 }
 function sumAllTrades(b){
   const active=getActiveYMs();
