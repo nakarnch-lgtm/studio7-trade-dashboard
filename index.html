@@ -990,7 +990,7 @@ async function processFiles(){
     // ชื่อพนักงานจากคอลัมน์ AR (Officer (Name)) ตามไฟล์ยอดขาย 52_april
     const kOffName=salesColByLetter(sS,'AR')||findCol(sS,['Officer (Name)','OfficerName','Officer Name']);
     const kDate   =findCol(sS,['Doc Date','DocDate','Date','วันที่']);
-    const sBillCol=salesColByLetter(sS,'Q')||findCol(sS,['Document No','Doc No','Invoice','เลขบิล'])||Object.keys(sS)[16]??null;
+    const sBillCol=salesColByLetter(sS,'Q')||findCol(sS,['Document No','Doc No','Invoice','เลขบิล'])||Object.keys(sS)[16]||null;
 
     // === SINGLE PASS: empNameMap + salesBranchIdMap + dates + salesByBranch + salesByEmp + billToEmp ===
     const empNameMap={}, salesBranchIdMap={}, activeMths=new Set(), activeDates=new Set();
