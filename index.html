@@ -663,6 +663,15 @@ function readXlsx(file){
   });
 }
 function findCol(sample, candidates){ for(const c of candidates){ if(c in sample) return c; } return candidates[0]; }
+/** คอลัมน์ Excel ตามตัวอักษร เช่น 'AR' → index 43 (0-based) */
+function salesColByLetter(sample, letter){
+  const keys=Object.keys(sample);
+  let n=0;
+  for(const ch of String(letter).toUpperCase()){
+    n=n*26+(ch.charCodeAt(0)-64);
+  }
+  return n>0&&n<=keys.length?keys[n-1]:null;
+}
 function s(v){ return v!=null?String(v):''; }
 function shortBranch(b){ if(!b)return'Unknown'; return b.includes(': ')?b.split(': ').slice(1).join(': '):b.includes(':')?b.split(':').slice(1).join(':').trim():b; }
 const _normCache=new Map();
@@ -922,9 +931,10 @@ async function processFiles(){
     const kPType =findCol(sS,['Product Type']);
     const kQty   =findCol(sS,['Number','Qty','Quantity']);
     const kOff    =findCol(sS,['Officer (ID)','OfficerID']);
-    const kOffName=findCol(sS,['Officer (Name)','OfficerName','Officer Name']);
+    // ชื่อพนักงานจากคอลัมน์ AR (Officer (Name)) ตามไฟล์ยอดขาย 52_april
+    const kOffName=salesColByLetter(sS,'AR')||findCol(sS,['Officer (Name)','OfficerName','Officer Name']);
     const kDate   =findCol(sS,['Doc Date','DocDate','Date','วันที่']);
-    const sBillCol=Object.keys(sS)[16]??null;
+    const sBillCol=Object.keys(sS)[16]??null; // คอลัมน์ Q = เลขบิลขาย
 
     // === SINGLE PASS: empNameMap + salesBranchIdMap + dates + salesByBranch + salesByEmp + billToEmp ===
     const empNameMap={}, salesBranchIdMap={}, activeMths=new Set(), activeDates=new Set();
