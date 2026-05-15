@@ -854,6 +854,8 @@ function tradeBillCandidates(r,tBillCol){
 }
 function isAgreedTrade(r,salesBillSet,tBillCol){
   if(!salesBillSet||!salesBillSet.size) return false;
+  var st=statusCode(r['BIDDING_STATUS_NAME']||r['สถานะ']||r.BIDDING_STATUS||r.status);
+  if(st!==1) return false;
   var cands=tradeBillCandidates(r,tBillCol);
   for(var i=0;i<cands.length;i++){
     var b=cands[i];
@@ -2467,7 +2469,7 @@ function calcEmpTradeStats(empId){
     var billEmp=billEmpIdForTradeRow(r);
     if(apiEmp!==id&&billEmp!==id) return;
     evaluated++;
-    if(isAgreedTrade(r,salesBillSet,tBillCol)&&billEmp===id) agreed++;
+    if(isAgreedTrade(r,salesBillSet,tBillCol)) agreed++;
   });
   return{agreed:agreed,evaluated:evaluated,not_agreed:evaluated-agreed};
 }
