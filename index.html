@@ -974,7 +974,9 @@ function parseTradeSearch(rows, activeDates, salesKeys, empNameMap={}, salesBran
     }
 
     if(empId){
-      if(!byEmp[empId])byEmp[empId]={name:displayName,nameFromSales:!!billMatch,branch:empBranch,agreed:0,evaluated:0};
+      const salesName=empNameMap[empId]||'';
+      if(!byEmp[empId])byEmp[empId]={name:salesName||displayName,nameFromSales:!!salesName,branch:empBranch,agreed:0,evaluated:0};
+      else if(salesName) byEmp[empId].name=salesName;
       else if(billMatch&&billMatch.name) byEmp[empId].name=billMatch.name;
       byEmp[empId].evaluated++;
     }
@@ -2126,7 +2128,8 @@ function renderEmpSummary(devs, amrmBranches){
     const devSold=devs.reduce((s,d)=>s+perDev[d],0);
     const trade=sumEmpTrade(empId);
     const agreed=trade.agreed, evaluated=trade.evaluated, notAgreed=trade.not_agreed||0;
-    if(devSold<=0||evaluated<=0)return null;
+    // ถ้าไม่มีชื่อจากฝั่งยอดขาย/เทรด ให้ยังโชว์ไว้ก่อนเพื่อไม่ให้รายชื่อหายไปหมด
+    if(!name&&devSold<=0&&evaluated<=0)return null;
     const attP=pct(agreed,devSold);
     return{empId,name,branch,perDev,devSold,evaluated,agreed,notAgreed,attP};
   }).filter(Boolean).sort((a,b)=>b.attP-a.attP||b.agreed-a.agreed||b.devSold-a.devSold);
@@ -2468,8 +2471,8 @@ function calcEmpTradeStats(empId){
     var apiEmp=s(r['รหัสพนักงานขาย']||'').trim();
     var billEmp=billEmpIdForTradeRow(r);
 
-    // ประเมิน = ทุกแถวที่ API ระบุพนักงานคนนี้
-    if(apiEmp===id) evaluated++;
+    // ประเมิน = ทุกแถวที่ API ระบุพนักงานคนนี้ (match ได้ด้วยรหัสจากไฟล์ขายด้วย)
+    if(apiEmp===id || billEmp===id) evaluated++;
 
     // ตกลง = เฉพาะแถวที่ผูกได้ทั้งบิลขาย + พนักงานจากไฟล์ขาย + สถานะตกลงจริง
     if(billEmp===id && isAgreedTrade(r,salesBillSet,tBillCol)) agreed++;
@@ -2486,6 +2489,12 @@ function sumEmpTrade(empId){
   }
   let agreed=0,evaluated=0;
   active.forEach(ym=>{const t=DATA.by_emp_ym?.[id]?.[ym]||{};agreed+=(t.agreed||0);evaluated+=(t.evaluated||0);});
+  // fallback: ถ้าไม่มีข้อมูลช่วงวันที่ แต่มีพนักงานใน by_emp ให้ยังมีชื่อแสดง
+  if(evaluated===0&&agreed===0&&DATA?.by_emp?.[id]){
+    const t=DATA.by_emp[id]||{agreed:0,evaluated:0};
+    agreed=t.agreed||0;
+    evaluated=t.evaluated||0;
+  }
   return{agreed,evaluated,not_agreed:evaluated-agreed};
 }
 function sumAllTrades(b){
