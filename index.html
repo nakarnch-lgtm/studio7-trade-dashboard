@@ -2109,7 +2109,10 @@ function renderEmpSummary(devs, amrmBranches){
 
   EMP_PAGE_DEVS=devs;
   EMP_CUR_PAGE=0;
-  EMP_LIST_CACHE=Object.keys(DATA.sales_by_emp).map(empId=>{
+  var empIds=new Set();
+  Object.keys(DATA.sales_by_emp||{}).forEach(function(id){ empIds.add(String(id)); });
+  Object.keys(DATA.by_emp||{}).forEach(function(id){ empIds.add(String(id)); });
+  EMP_LIST_CACHE=[...empIds].map(function(empId){
     const branch=DATA.by_emp[empId]?.branch||DATA.emp_branch[empId]||'Unknown';
     if(amrmBranches&&!amrmBranches.has(branch))return null;
     const name=DATA.by_emp[empId]?.name||DATA.emp_names[empId]||empId;
@@ -2117,12 +2120,13 @@ function renderEmpSummary(devs, amrmBranches){
     devs.forEach(d=>{ perDev[d]=sumEmpSales(empId,[d]); });
     const devSold=devs.reduce((s,d)=>s+perDev[d],0);
     const {agreed,evaluated}=sumEmpTrade(empId);
+    if(devSold<=0||evaluated<=0)return null;
     const attP=pct(agreed,devSold);
     return{empId,name,branch,perDev,devSold,evaluated,agreed,attP};
   }).filter(Boolean).sort((a,b)=>b.attP-a.attP||b.agreed-a.agreed||b.devSold-a.devSold);
 
   if(EMP_LIST_CACHE.length===0){
-    wrap.innerHTML='<div class="py-14 text-center text-gray-400 text-sm">ไม่มีข้อมูลพนักงานในช่วงที่เลือก</div>';
+    wrap.innerHTML='<div class="py-14 text-center text-gray-400 text-sm">ไม่มีพนักงานที่มียอดขายและยอดเทรดในช่วงที่เลือก</div>';
     return;
   }
   renderEmpPage(0);
