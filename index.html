@@ -659,6 +659,16 @@ function mapTradeApiToRows(trades){
     };
   });
 }
+
+function resolveTradeEmpId(r){
+  var code=s(r['รหัสพนักงานขาย']||'').trim();
+  var name=s(r['ชื่อพนักงานขาย']||'').trim();
+  var nameLooksLikeCode=/^[A-Za-z0-9._-]{2,}$/.test(name) && !/\s/.test(name);
+  // ถ้าชื่อเป็นรหัส ให้ถือว่าเป็น supersale และใช้รหัสในช่องชื่อเป็นรหัสพนักงานแทน
+  if(nameLooksLikeCode) return name;
+  // ถ้าชื่อเป็นชื่อคน ให้ใช้รหัสจากช่องรหัสเป็นหลัก
+  return code;
+}
 async function reloadTradeApi(){
   return previewSalesBranchesFromFiles();
 }
@@ -966,7 +976,7 @@ function parseTradeSearch(rows, activeDates, salesKeys, empNameMap={}, salesBran
       displayName=billMatch.name;
       empBranch=billMatch.branch||branch;
     } else {
-      empId=s(r['รหัสพนักงานขาย']||'');
+      empId=resolveTradeEmpId(r);
       const tradeEmpName=s(r['ชื่อพนักงานขาย']||'');
       const salesEmpName=empId?empNameMap[empId]||'':'';
       displayName=salesEmpName||tradeEmpName;
@@ -2468,10 +2478,10 @@ function calcEmpTradeStats(empId){
   var evaluated=0, agreed=0;
   (RAW_TRADE_ROWS||[]).forEach(function(r){
     if(!tradeRowInActiveRange(r)) return;
-    var apiEmp=s(r['รหัสพนักงานขาย']||'').trim();
+    var apiEmp=resolveTradeEmpId(r);
     var billEmp=billEmpIdForTradeRow(r);
 
-    // ประเมิน = ทุกแถวที่ API ระบุพนักงานคนนี้ (match ได้ด้วยรหัสจากไฟล์ขายด้วย)
+    // ประเมิน = ทุกแถวที่ระบุพนักงานคนนี้จาก trade API หรือ resolve จาก supersale
     if(apiEmp===id || billEmp===id) evaluated++;
 
     // ตกลง = เฉพาะแถวที่ผูกได้ทั้งบิลขาย + พนักงานจากไฟล์ขาย + สถานะตกลงจริง
