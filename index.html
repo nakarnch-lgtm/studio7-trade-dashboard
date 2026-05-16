@@ -41,10 +41,10 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
         <div class="text-gray-400 text-sm font-medium">Trade In Dashboard</div>
       </div>
     </div>
-    <p class="text-gray-600 text-sm font-medium">อัปโหลดไฟล์ Excel 2–3 ไฟล์เพื่อเริ่มวิเคราะห์ข้อมูล</p>
+    <p class="text-gray-600 text-sm font-medium">อัปโหลดไฟล์ยอดขาย และ (ถ้ามี) ไฟล์ ASM/RSM เพื่อเริ่มวิเคราะห์ข้อมูล</p>
     <div class="mt-2 flex items-center justify-center gap-2 text-xs text-gray-400">
       <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
-      ประมวลผลในเบราว์เซอร์เท่านั้น · ไม่มีการส่งข้อมูลออก · รีเฟรชเพื่อล้างข้อมูล
+      ดึงข้อมูลเทรดจาก API อัตโนมัติ · ประมวลผลในเบราว์เซอร์เป็นหลัก · รีเฟรชเพื่อล้างข้อมูล
     </div>
   </div>
 
@@ -68,36 +68,19 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
       <input type="file" id="input-sales" accept=".xlsx,.xls" class="hidden" multiple onchange="onFileSelect(event,'sales')">
     </div>
 
-    <!-- File 2: Trade (Hybrid: API or File) -->
+    <!-- Step 2: Trade data from TechTrade API (report-trade.vercel.app) -->
     <div>
       <div class="flex items-center gap-2 mb-2.5">
         <span class="w-6 h-6 rounded-full bg-[#C8A96B] text-[#1F3B2D] flex items-center justify-center text-xs font-black shrink-0">2</span>
-        <span class="text-xs font-bold text-gray-600 uppercase tracking-wide">รายงานเทรด</span>
+        <span class="text-xs font-bold text-gray-600 uppercase tracking-wide">ข้อมูลเทรด (API)</span>
       </div>
-      <!-- API source card (shown when API has data) -->
-      <div id="trade-api-card" class="hidden bg-white rounded-2xl shadow-card border-2 border-[#C8A96B] p-4 text-center">
+      <div id="trade-api-card" class="bg-white rounded-2xl shadow-card border-2 border-[#C8A96B] p-4 text-center">
         <div class="text-2xl mb-1">🔗</div>
-        <div class="text-xs font-bold text-[#9E7A3F]">ใช้ข้อมูลจาก API</div>
-        <div id="trade-api-info" class="text-[10px] text-gray-500 mt-0.5"></div>
-        <div class="flex gap-1.5 mt-2.5">
-          <button onclick="setTradeApiMode(false)" id="trade-api-off" class="flex-1 text-[10px] font-semibold rounded-lg py-1 border border-gray-200 text-gray-500 hover:bg-gray-50">อัปโหลดไฟล์แทน</button>
-          <button onclick="setTradeApiMode(true)" id="trade-api-on" class="flex-1 text-[10px] font-bold rounded-lg py-1 bg-[#1F3B2D] text-white">✓ ใช้ข้อมูลนี้</button>
-        </div>
+        <div class="text-xs font-bold text-[#9E7A3F]">TechTrade API</div>
+        <div id="trade-api-info" class="text-[10px] text-gray-500 mt-0.5">รออัปโหลดไฟล์ยอดขาย</div>
+        <button type="button" id="trade-api-preview-btn" onclick="previewSalesBranchesFromFiles()" class="hidden w-full mt-2.5 text-[10px] font-bold rounded-lg py-1.5 bg-[#C8A96B] text-[#1F3B2D] hover:opacity-90 transition-opacity">ตรวจสอบสาขาในไฟล์ขาย</button>
+        <p class="text-[9px] text-gray-400 mt-1 leading-snug px-1">ดึงเทรดจาก API เมื่อกดประมวลผลเท่านั้น · ตามวันที่ + branch ในไฟล์ขาย</p>
       </div>
-      <!-- File upload drop zone (shown when no API data or user chose file) -->
-      <div id="drop-trade-wrap">
-        <div id="drop-trade"
-          class="drop-zone bg-white rounded-2xl shadow-card border-2 border-dashed border-gray-200 p-6 text-center cursor-pointer transition-all hover:border-[#C8A96B] hover:bg-[#FDF9F0]"
-          onclick="document.getElementById('input-trade').click()"
-          ondragover="onDragOver(event,'drop-trade')" ondragleave="onDragLeave('drop-trade')" ondrop="onDrop(event,'trade')">
-          <div class="text-3xl mb-2">🔄</div>
-          <div class="text-sm font-semibold text-gray-700 mb-0.5">คลิกหรือลากไฟล์มาวาง</div>
-          <div class="text-xs text-gray-400">trade_report / trade_search · หลายไฟล์ได้</div>
-        </div>
-        <div id="trade-file-list" class="hidden mt-2 space-y-1"></div>
-        <button id="trade-add-btn" class="hidden w-full mt-2 text-xs font-semibold text-[#9E7A3F] border border-dashed border-[#C8A96B] rounded-xl py-1.5 hover:bg-[#FDF6E8] transition-all" onclick="document.getElementById('input-trade').click()">+ เพิ่มไฟล์เทรด</button>
-      </div>
-      <input type="file" id="input-trade" accept=".xlsx,.xls" class="hidden" multiple onchange="onFileSelect(event,'trade')">
     </div>
 
     <!-- File 3: ASM mapping (optional) -->
@@ -125,7 +108,7 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
   </button>
 
   <div id="trade-hint" class="hidden mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-center">
-    📂 กรุณาอัปโหลด<strong>ไฟล์รายงานเทรด</strong> (ช่องที่ 2) เพื่อเปิดใช้ปุ่มประมวลผล
+    📂 กรุณาอัปโหลด<strong>ไฟล์ยอดขาย</strong> (ช่องที่ 1) เพื่อเปิดใช้ปุ่มประมวลผล — ข้อมูลเทรดดึงจาก API อัตโนมัติ
   </div>
 
   <div id="upload-error" class="hidden mt-4 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-5 py-3"></div>
@@ -161,6 +144,7 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
       <p class="text-gray-500 text-xs mt-0.5">
         ATT% = <span class="font-semibold text-[#1F3B2D]">จำนวนตกลงเทรด</span>
         ÷ <span class="font-semibold text-[#C8A96B]">จำนวน Device ที่ขาย</span>
+        &nbsp;· ตกลงเทรด = เลขบิล API ตรงกับไฟล์ยอดขาย
         &nbsp;· เลือก Device เพื่อปรับการคำนวณ
       </p>
     </div>
@@ -468,64 +452,64 @@ const BRANCH_COLORS = [
   {from:'from-[#1e3a8a]',to:'to-[#60a5fa]',icon:'🏪'},
 ];
 
-let DATA = null, fileSales = [], fileTrade = [], fileASM = null, DATA_MONTHS = '';
+let DATA = null, fileSales = [], fileASM = null, DATA_MONTHS = '';
 let RAW_SALES_ROWS = [], RAW_TRADE_ROWS = [], SALES_COL_KEYS = null;
 let DRILL_BRANCH = null;
 let SELECTED_BRANCHES = new Set();
 let DATE_RANGE_START = null;
 let DATE_RANGE_END = null;
-let TRADE_API_MODE = false;    // true = ใช้ข้อมูลเทรดจาก API แทนไฟล์
-let TRADE_API_INFO = null;     // { rowCount, dateRange } จาก /api/import/trade-rows
+let TRADE_API_INFO = null;     // { rowCount, dateRange } จากสรุป API
 
-// ===== HYBRID TRADE MODE =====
+// ===== TRADE API (TechTrade) =====
 function checkProcessReady(){
   const btn = document.getElementById('process-btn');
   const hint = document.getElementById('trade-hint');
   if(fileSales.length){
     btn.classList.remove('hidden');
     hint.classList.add('hidden');
+    updateTradeApiPreviewButton();
+    previewSalesBranchesFromFiles();
   } else {
     btn.classList.add('hidden');
     hint.classList.add('hidden');
+    setTradeApiCardIdle();
   }
 }
-function setTradeApiMode(on){
-  TRADE_API_MODE = on;
-  // Toggle UI: API card active state vs file drop zone
-  const onBtn = document.getElementById('trade-api-on');
-  const offBtn = document.getElementById('trade-api-off');
-  const wrap = document.getElementById('drop-trade-wrap');
-  if(on){
-    onBtn.classList.add('ring-2','ring-[#1F3B2D]');
-    offBtn.classList.remove('ring-2','ring-[#1F3B2D]');
-    wrap.classList.add('opacity-30','pointer-events-none');
-    fileTrade = []; renderFileList('trade');
-  } else {
-    onBtn.classList.remove('ring-2','ring-[#1F3B2D]');
-    offBtn.classList.add('ring-2','ring-[#1F3B2D]');
-    wrap.classList.remove('opacity-30','pointer-events-none');
-  }
-  checkProcessReady();
+function setTradeApiCardIdle(){
+  var info=document.getElementById('trade-api-info');
+  var btn=document.getElementById('trade-api-preview-btn');
+  if(info) info.textContent='รออัปโหลดไฟล์ยอดขาย — ยังไม่ดึงข้อมูลเทรด';
+  if(btn) btn.classList.add('hidden');
 }
-async function initTradeApiCard(){
+function updateTradeApiPreviewButton(){
+  var btn=document.getElementById('trade-api-preview-btn');
+  if(btn) btn.classList.toggle('hidden', fileSales.length===0);
+}
+/** อ่านไฟล์ขายในเครื่องเท่านั้น — ไม่เรียก API เทรด */
+async function previewSalesBranchesFromFiles(){
+  var info=document.getElementById('trade-api-info');
+  if(!fileSales.length){ setTradeApiCardIdle(); return; }
+  if(info) info.textContent='กำลังอ่านรหัสสาขาจากไฟล์ขาย…';
   try{
-    const r = await fetch('/api/import/trade-rows');
-    if(!r.ok) return;
-    const d = await r.json();
-    if(!d.rowCount) return;
-    TRADE_API_INFO = d;
-    const card = document.getElementById('trade-api-card');
-    card.classList.remove('hidden');
-    const info = document.getElementById('trade-api-info');
-    const fr = d.dateRange?.from ? new Date(d.dateRange.from) : null;
-    const to = d.dateRange?.to   ? new Date(d.dateRange.to)   : null;
-    const fmt = dt => dt ? `${dt.getDate()}/${dt.getMonth()+1}/${dt.getFullYear()+543}` : '';
-    info.textContent = `${d.rowCount.toLocaleString()} รายการ · ${fr?fmt(fr):''}${to&&fr&&fmt(to)!==fmt(fr)?' – '+fmt(to):''}`;
-    setTradeApiMode(true); // default เลือก API mode ถ้ามีข้อมูล
-  } catch(e){}
+    var rows=await Promise.all(fileSales.map(readXlsx)).then(function(arrs){ return arrs.flat(); });
+    var sS=rows[0]||{};
+    var kBranchId=findCol(sS,['Branch (ID)']);
+    var kBranch=findCol(sS,['Branch (Name)','Branch']);
+    var ids=new Set();
+    rows.forEach(function(r){
+      var bid=String(Number(s(r[kBranchId]))||0);
+      if(bid==='0'){ var m=s(r[kBranch]).match(/^ID(\d+)\s*:\s*/i); if(m) bid=String(parseInt(m[1],10)); }
+      if(bid&&bid!=='0') ids.add(bid);
+    });
+    if(info){
+      if(ids.size) info.textContent='พบ '+ids.size+' สาขาในไฟล์ขาย · กดประมวลผลเพื่อดึงเทรดเฉพาะสาขานี้';
+      else info.textContent='ไม่พบรหัสสาขา — ตรวจคอลัมน์ Branch (ID) ในไฟล์ขาย';
+    }
+  }catch(e){
+    if(info) info.textContent='อ่านไฟล์ไม่สำเร็จ: '+(e&&e.message?e.message:String(e));
+  }
 }
-// เรียกตอนหน้าเว็บโหลด
-document.addEventListener('DOMContentLoaded', ()=>{ initTradeApiCard(); });
+document.addEventListener('DOMContentLoaded', function(){ setTradeApiCardIdle(); });
 
 // ปิด branch dropdown เมื่อคลิกนอก
 document.addEventListener('click', e=>{
@@ -540,12 +524,12 @@ function onDrop(e,type){ e.preventDefault(); onDragLeave('drop-'+type); Array.fr
 function onFileSelect(e,type){ Array.from(e.target.files||[]).forEach(f=>handleFile(f,type)); e.target.value=''; }
 
 function renderFileList(type){
-  const files=type==='sales'?fileSales:fileTrade;
+  if(type !== 'sales') return;
+  const files=fileSales;
   const listEl=document.getElementById(type+'-file-list');
   const addBtn=document.getElementById(type+'-add-btn');
-  const color=type==='sales'?'#1F3B2D':'#9E7A3F';
-  const bg=type==='sales'?'#E8F5EE':'#FDF6E8';
-  const border=type==='sales'?'#1F3B2D':'#C8A96B';
+  const color='#1F3B2D';
+  const bg='#E8F5EE';
   if(files.length===0){ listEl.classList.add('hidden'); addBtn.classList.add('hidden'); return; }
   listEl.innerHTML=files.map((f,i)=>`<div class="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold" style="background:${bg};color:${color}"><span class="truncate flex-1">📄 ${f.name}</span><button onclick="removeFile('${type}',${i})" class="shrink-0 hover:opacity-60 font-bold text-base leading-none ml-1">×</button></div>`).join('');
   listEl.classList.remove('hidden');
@@ -553,7 +537,6 @@ function renderFileList(type){
 }
 function removeFile(type,idx){
   if(type==='sales') fileSales.splice(idx,1);
-  else fileTrade.splice(idx,1);
   renderFileList(type);
   checkProcessReady();
 }
@@ -561,23 +544,194 @@ function handleFile(file, type){
   if(type==='sales'){
     fileSales.push(file);
     renderFileList('sales');
-  } else if(type==='trade'){
-    fileTrade.push(file);
-    renderFileList('trade');
-    // เมื่อเลือกไฟล์เทรด ให้ปิด API mode อัตโนมัติ
-    if(TRADE_API_MODE) setTradeApiMode(false);
   } else if(type==='asm'){
     fileASM=file; mark('asm-filename','👥 '+file.name,'text-sky-700','bg-sky-50');
   }
   checkProcessReady();
 }
-function mark(id, text, textCls, bgCls){
-  const el=document.getElementById(id);
-  el.textContent=text; el.className=`mt-3 text-xs font-semibold rounded-xl px-3 py-1.5 ${textCls} ${bgCls}`;
-  el.classList.remove('hidden');
+/** จาก activeDates (DD/MM/YYYY CE) ในไฟล์ขาย → ช่วง ISO สำหรับ query API + buffer วันละรอบเทรด */
+function isoDateRangeFromSalesActiveDates(activeDates){
+  if(!activeDates||activeDates.size===0) return null;
+  var minT=Infinity, maxT=-Infinity;
+  activeDates.forEach(function(ds){
+    var m=String(ds).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if(!m) return;
+    var t=new Date(parseInt(m[3],10), parseInt(m[2],10)-1, parseInt(m[1],10)).getTime();
+    if(t<minT) minT=t;
+    if(t>maxT) maxT=t;
+  });
+  if(!isFinite(minT)) return null;
+  var PAD_MS=14*86400000;
+  var start=new Date(minT-PAD_MS);
+  var endMs=Math.min(maxT+PAD_MS, Date.now());
+  var end=new Date(endMs);
+  if(start>end){ var x=start; start=end; end=x; }
+  return { start:start.toISOString().slice(0,10), end:end.toISOString().slice(0,10) };
+}
+/** API ไม่รองรับ pagination — ใช้ limit สูงสุดที่ทดสอบแล้ว (50k) เพื่อไม่ให้ยอดเทรดหายจากถูกตัด */
+function tradeApiLimitForIsoRange(startIso, endIso){
+  return '50000';
+}
+/**
+ * ขยาย activeDates เป็นทุกวันปฏิทินระหว่าง min–max ของวันที่ในไฟล์ขาย
+ * (เดิมมีแค่วันที่มีบรรทัดขาย → trade วันที่ไม่มีขายในวันนั้นถูกตัดหมด ทำให้ยอดประเมินไม่ตรง)
+ */
+function expandActiveDatesHull(activeDates){
+  if(!activeDates||activeDates.size===0) return activeDates;
+  var minT=Infinity, maxT=-Infinity;
+  activeDates.forEach(function(ds){
+    var m=String(ds).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if(!m) return;
+    var t=new Date(parseInt(m[3],10), parseInt(m[2],10)-1, parseInt(m[1],10)).getTime();
+    if(t<minT) minT=t;
+    if(t>maxT) maxT=t;
+  });
+  if(!isFinite(minT)) return activeDates;
+  var out=new Set();
+  for(var t=minT;t<=maxT;t+=86400000){
+    var d=new Date(t);
+    var dd=String(d.getDate()).padStart(2,'0');
+    var mm=String(d.getMonth()+1).padStart(2,'0');
+    var yy=d.getFullYear();
+    out.add(dd+'/'+mm+'/'+yy);
+  }
+  return out;
+}
+/** รหัสสาขาจากไฟล์ขาย → พารามิเตอร์ branch ของ API (เช่น "645,646") */
+function branchParamFromSalesMap(salesBranchIdMap){
+  var ids=Object.keys(salesBranchIdMap||{}).filter(function(id){ return id&&id!=='0'; });
+  if(!ids.length) return null;
+  return ids.join(',');
+}
+/**
+ * @param {string|null} startIso - YYYY-MM-DD หรือ null = default 12 เดือนล่าสุด
+ * @param {string|null} endIso
+ * @param {string|null} limitStr
+ * @param {string|null} branchParam - รหัสสาขาคั่น comma ตาม API docs
+ */
+async function fetchTradeApiRows(startIso, endIso, limitStr, branchParam){
+  const url = new URL('/api/trade-rows', window.location.origin);
+  const today = new Date();
+  var end = endIso || today.toISOString().slice(0,10);
+  var start;
+  if(startIso&&endIso){
+    start=startIso;
+    if(new Date(start)>new Date(end)){ var sw=start; start=end; end=sw; }
+  } else {
+    var startDate=new Date(today);
+    startDate.setMonth(startDate.getMonth()-12);
+    start=startDate.toISOString().slice(0,10);
+  }
+  url.searchParams.set('start_date', start);
+  url.searchParams.set('end_date', end);
+  url.searchParams.set('limit', limitStr||'50000');
+  if(branchParam) url.searchParams.set('branch', branchParam);
+
+  const resp = await fetch(url.toString());
+  if (!resp.ok) throw new Error('โหลดข้อมูลเทรดจาก API ไม่สำเร็จ (' + resp.status + ')');
+  const json = await resp.json();
+  if (!json || json.success === false) throw new Error('API ตอบกลับไม่ถูกต้อง');
+  return json.data || [];
+}
+function mapTradeApiToRows(trades){
+  return trades.map(function(t){
+    var rid = t.real_branch_id != null ? String(t.real_branch_id) : '';
+    var bid = t.branch_id != null ? String(parseInt(String(t.branch_id), 10) || '') : '';
+    var code = rid ? String(parseInt(rid, 10) || '') : bid;
+    var bst = 0;
+    if(t.BIDDING_STATUS != null && t.BIDDING_STATUS !== '') bst = Number(t.BIDDING_STATUS) || 0;
+    else bst = Number(t.status) || 0;
+    return {
+      'trade_in_id': t.trade_in_id,
+      'real_branch_id': rid,
+      'document_no': t.document_no || t.invoice_no || '',
+      'invoice_no': String(t.invoice_no != null ? t.invoice_no : '').trim(),
+      'document_date': t.document_date || '',
+      'net_price': t.net_price != null ? Number(t.net_price) : 0,
+      'series': t.series || t.category_name || '',
+      'ชื่อสาขา': t.branch_name || '',
+      'branch_code': code,
+      'วันที่คำสั่งเทรด': t.document_date || '',
+      'BIDDING_STATUS': bst,
+      'สถานะ': String(t.BIDDING_STATUS_NAME != null ? t.BIDDING_STATUS_NAME : '').replace(/\s+/g,' ').trim(),
+      'รหัสพนักงานขาย': String(t.SALE_CODE || t.sale_code || ''),
+      'ชื่อพนักงานขาย': t.SALE_NAME || t.sale_name || t.employee_name || '',
+    };
+  });
 }
 
-// ===== PARSE =====
+const SUPERSALE_PATTERNS = [
+  /^sup[-_ ]?sale$/i,
+  /^supersale$/i,
+  /^super[-_ ]?sale$/i,
+  /^ss[-_ ]?\d+$/i,
+  /^ss\d+$/i,
+  /^sp[-_ ]?\d+$/i,
+  /^sp\d+$/i,
+  /^sales?[-_ ]?\d+$/i,
+  /^trade[-_ ]?\d+$/i,
+];
+function looksLikeSupersaleToken(v){
+  var text=s(v||'').trim();
+  if(!text) return false;
+  return SUPERSALE_PATTERNS.some(function(re){ return re.test(text); });
+}
+function resolveTradeEmpId(r, empNameMap, billMeta){
+  var code=s(r['รหัสพนักงานขาย']||'').trim();
+  var name=s(r['ชื่อพนักงานขาย']||'').trim();
+  var codeLooksLikeCode=/^[A-Za-z0-9._-]{2,}$/.test(code) && !/\s/.test(code);
+  var nameLooksLikeCode=/^[A-Za-z0-9._-]{2,}$/.test(name) && !/\s/.test(name);
+  var isAccessoryOnly=billMeta&&billMeta.hasAccessory&&!billMeta.hasDevice;
+  var preferCode=billMeta&&billMeta.hasDevice;
+
+  // Bill ที่มี device หรือ device+accessory → ใช้รหัสพนักงานขายจากช่อง code เป็นหลัก
+  if(preferCode){
+    if(codeLooksLikeCode && empNameMap && empNameMap[code]) return code;
+    if(nameLooksLikeCode && empNameMap && empNameMap[name]) return name;
+    if(codeLooksLikeCode) return code;
+    if(nameLooksLikeCode) return name;
+    return code;
+  }
+
+  // Bill ที่เป็น accessory อย่างเดียว → มักเป็น supersale
+  if(isAccessoryOnly){
+    if(nameLooksLikeCode && empNameMap && empNameMap[name]) return name;
+    if(looksLikeSupersaleToken(name) && code) return code;
+    if(codeLooksLikeCode && empNameMap && empNameMap[code]) return code;
+    if(codeLooksLikeCode) return code;
+    if(nameLooksLikeCode) return name;
+    return code;
+  }
+
+  // อื่น ๆ: ใช้ชื่อถ้าเป็นรหัสจริง, ไม่งั้นใช้รหัส
+  if(nameLooksLikeCode && empNameMap && empNameMap[name]) return name;
+  if(codeLooksLikeCode && empNameMap && empNameMap[code]) return code;
+  if(nameLooksLikeCode) return name;
+  return code;
+}
+async function reloadTradeApi(){
+  return previewSalesBranchesFromFiles();
+}
+/** สำรอง: กรองฝั่ง browser หาก API ไม่ส่ง branch หรือ mapping สาขาไม่ตรง */
+function filterTradesForSalesScope(trades, salesBranchIdMap, salesKeys){
+  var ids=Object.keys(salesBranchIdMap||{}).filter(function(id){ return id&&id!=='0'; });
+  if(ids.length===0&&(!salesKeys||!salesKeys.length)) return trades;
+  var idSet=new Set(ids);
+  var keySet=new Set(salesKeys||[]);
+  return trades.filter(function(t){
+    var rid=t.real_branch_id!=null?String(parseInt(String(t.real_branch_id),10)||''):'';
+    var bid=t.branch_id!=null?String(parseInt(String(t.branch_id),10)||''):'';
+    if(rid&&rid!=='0'&&idSet.has(rid)) return true;
+    if(bid&&bid!=='0'&&idSet.has(bid)) return true;
+    var raw=t.branch_name||'';
+    if(!raw) return false;
+    var bn=shortBranch(raw);
+    if(keySet.has(bn)) return true;
+    var matched=matchBranch(bn,salesKeys);
+    return !!(matched&&keySet.has(matched));
+  });
+}
+
 function readXlsx(file){
   return new Promise((res,rej)=>{
     const r=new FileReader();
@@ -594,6 +748,15 @@ function readXlsx(file){
   });
 }
 function findCol(sample, candidates){ for(const c of candidates){ if(c in sample) return c; } return candidates[0]; }
+/** คอลัมน์ Excel ตามตัวอักษร เช่น 'AR' → index 43 (0-based) */
+function salesColByLetter(sample, letter){
+  const keys=Object.keys(sample);
+  let n=0;
+  for(const ch of String(letter).toUpperCase()){
+    n=n*26+(ch.charCodeAt(0)-64);
+  }
+  return n>0&&n<=keys.length?keys[n-1]:null;
+}
 function s(v){ return v!=null?String(v):''; }
 function shortBranch(b){ if(!b)return'Unknown'; return b.includes(': ')?b.split(': ').slice(1).join(': '):b.includes(':')?b.split(':').slice(1).join(':').trim():b; }
 const _normCache=new Map();
@@ -713,6 +876,56 @@ function parseASMFile(rows, salesKeys, salesBranchIdMap={}, salesFileIds=null){
   });
   return map;
 }
+/** เลขบิลจากไฟล์ขาย (คอลัม Q) ↔ invoice_no ใน API — ตรงกัน = ตกลงเทรด */
+function normBill(v){
+  var b=s(v).trim();
+  if(!b) return '';
+  if(/^\d+\.0$/.test(b)) b=b.slice(0,-2);
+  var plain=b.replace(/,/g,'');
+  if(/^-?\d+(\.\d+)?$/.test(plain)){
+    var n=Number(plain);
+    if(!isNaN(n)) return String(Math.round(n)===n?Math.round(n):n);
+  }
+  return b;
+}
+function addSalesBill(set,bill){
+  if(!bill) return;
+  set.add(bill);
+  var stripped=bill.replace(/^0+/,'');
+  if(stripped&&stripped!==bill) set.add(stripped);
+}
+function tradeBillCandidates(r,tBillCol){
+  var out=[], seen=new Set();
+  function push(v){ v=normBill(v); if(v&&!seen.has(v)){ seen.add(v); out.push(v); } }
+  if(tBillCol) push(r[tBillCol]);
+  push(r['invoice_no']);
+  push(r['document_no']);
+  return out;
+}
+function isAgreedTrade(r,salesBillSet,tBillCol){
+  if(!salesBillSet||!salesBillSet.size) return false;
+  var st=statusCode(r['BIDDING_STATUS_NAME']||r['สถานะ']||r.BIDDING_STATUS||r.status);
+  if(st!==1) return false;
+  var cands=tradeBillCandidates(r,tBillCol);
+  for(var i=0;i<cands.length;i++){
+    var b=cands[i];
+    if(salesBillSet.has(b)) return true;
+    var stripped=b.replace(/^0+/,'');
+    if(stripped&&salesBillSet.has(stripped)) return true;
+  }
+  return false;
+}
+function tradeRowYm(r){
+  var td=s(r['วันที่คำสั่งเทรด']||'');
+  var isoM=td.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(isoM) td=isoM[3]+'/'+isoM[2]+'/'+isoM[1];
+  var tm=td.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  if(!tm) return null;
+  var ceY=parseInt(tm[3],10)>2100?parseInt(tm[3],10)-543:parseInt(tm[3],10);
+  var mn=parseInt(tm[2],10);
+  if(mn<1||mn>12) return null;
+  return ceY+'-'+String(mn).padStart(2,'0');
+}
 // ตรวจรูปแบบไฟล์ trade: 'search' = transaction-level, 'report' = 3-row-per-branch summary
 function detectTradeFormat(rows){
   const first=rows[0]||{};
@@ -733,16 +946,14 @@ function devFromProduct(prod){
 // activeDates = Set of "DD/MM/YYYY" CE strings; empty Set = no filter
 // empNameMap = {officerId(string) → officerName} จากไฟล์ยอดขาย
 // salesBranchIdMap = {branchId(string) → branchName} จับคู่ด้วย ID แทนชื่อ
-// billToEmp = {billNo(string) → {empId,name,branch}} lookup จากเลขบิล Sales คอลัม Q
-// tBillCol = ชื่อ header ของคอลัม IT ในไฟล์เทรด (เลขบิลขาย)
-function parseTradeSearch(rows, activeDates, salesKeys, empNameMap={}, salesBranchIdMap={}, billToEmp={}, tBillCol=null){
-  // ตกลงเทรด = สิ้นสุดการประเมินราคา (5) เท่านั้น
-  // ยอดประเมิน = ทุกสถานะ (นับทุก row)
-  const AGREED_STATUS=new Set([5]);
+// salesBillSet = Set เลขบิลทั้งหมดจากไฟล์ขาย (คอลัม Q)
+// billToEmp = {billNo → {empId,name,branch}} ชื่อจากคอลัม AR (Officer Name)
+function parseTradeSearch(rows, activeDates, salesKeys, empNameMap={}, salesBranchIdMap={}, billToEmp={}, salesBillSet=null, tBillCol=null){
+  // ตกลงเทรด = เลขบิลใน API ตรงกับเลขบิลในไฟล์ยอดขาย · ยอดประเมิน = ทุก row ใน API
   const summary={};
   const byEmp={};
-  // Map สถานะ Thai text → numeric code (เหมือน server-side kpi-calculator)
-  const THAI_STATUS_CODE={'สิ้นสุดการประเมินราคา':5,'ยืนยันราคาแล้ว':7,'ยกเลิกรายการ':6,'รอผู้ขายยืนยันราคา':3,'รอการประเมินราคา':1,'อยู่ระหว่างผู้รับซื้อให้ราคา':2,'กำลังสร้างเอกสาร':4};
+  const tradeByYm={};
+  const byEmpYm={};
   rows.forEach(r=>{
     // ===== Branch matching =====
     // บางสาขา ชื่อสาขา = "ID2926 Studio7-STA-Pakchong" (ไม่มี colon)
@@ -778,28 +989,35 @@ function parseTradeSearch(rows, activeDates, salesKeys, empNameMap={}, salesBran
       if(isoM)td=`${isoM[3]}/${isoM[2]}/${isoM[1]}`;
       if(!activeDates.has(td))return;
     }
-    // ยอดเห็นด้วย: ลอง BIDDING_STATUS (ตัวเลข) ก่อน ถ้าไม่มีให้ใช้ สถานะ (Thai text)
-    let bst=0;
-    if(r['BIDDING_STATUS']!=null&&r['BIDDING_STATUS']!==''){bst=Number(r['BIDDING_STATUS'])||0;}
-    else{bst=THAI_STATUS_CODE[s(r['สถานะ']||'')]||0;}
-    const agreed=AGREED_STATUS.has(bst)?1:0;
+    const billCands=tradeBillCandidates(r,tBillCol);
+    const billNo=billCands[0]||'';
+    let billMatch=null;
+    for(var bi=0;bi<billCands.length&&!billMatch;bi++){
+      if(billToEmp[billCands[bi]]) billMatch=billToEmp[billCands[bi]];
+    }
+    const agreed=isAgreedTrade(r,salesBillSet,tBillCol)?1:0;
     if(!summary[branch])summary[branch]={evaluated:0,agreed:0,not_agreed:0};
     summary[branch].evaluated++;
     if(agreed)summary[branch].agreed++;
     else summary[branch].not_agreed++;
+    const ym=tradeRowYm(r);
+    if(ym){
+      if(!tradeByYm[branch])tradeByYm[branch]={};
+      if(!tradeByYm[branch][ym])tradeByYm[branch][ym]={agreed:0,evaluated:0};
+      tradeByYm[branch][ym].evaluated++;
+      if(agreed)tradeByYm[branch][ym].agreed++;
+    }
 
     // === Lookup พนักงานจากเลขบิลขาย (คอลัม IT ของ trade = คอลัม Q ของ 1724) ===
-    // ถ้า lookup ได้ → ใช้ข้อมูลจากไฟล์ยอดขายแทน (แก้ปัญหากรอกรหัสพนักงานผิด)
-    const billNo=tBillCol?s(r[tBillCol]||''):'';
-    const billMatch=billNo?billToEmp[billNo]:null;
 
+    const billMeta=getBillMetaByBill(billNo);
     let empId, displayName, empBranch;
     if(billMatch){
       empId=billMatch.empId;
       displayName=billMatch.name;
       empBranch=billMatch.branch||branch;
     } else {
-      empId=s(r['รหัสพนักงานขาย']||'');
+      empId=resolveTradeEmpId(r, empNameMap, billMeta);
       const tradeEmpName=s(r['ชื่อพนักงานขาย']||'');
       const salesEmpName=empId?empNameMap[empId]||'':'';
       displayName=salesEmpName||tradeEmpName;
@@ -807,12 +1025,35 @@ function parseTradeSearch(rows, activeDates, salesKeys, empNameMap={}, salesBran
     }
 
     if(empId){
-      if(!byEmp[empId])byEmp[empId]={name:displayName,nameFromSales:!!billMatch,branch:empBranch,agreed:0,evaluated:0};
+      const salesName=empNameMap[empId]||'';
+      if(!byEmp[empId])byEmp[empId]={name:salesName||displayName,nameFromSales:!!salesName,branch:empBranch,agreed:0,evaluated:0};
+      else if(salesName) byEmp[empId].name=salesName;
+      else if(billMatch&&billMatch.name) byEmp[empId].name=billMatch.name;
       byEmp[empId].evaluated++;
-      if(agreed)byEmp[empId].agreed++;
+    }
+    // ตกลงเทรด → รหัส/ชื่อพนักงานจากไฟล์ยอดขาย (จับคู่เลขบิล) เท่านั้น
+    if(agreed&&billMatch){
+      const saleEmpId=billMatch.empId;
+      const saleName=billMatch.name||empNameMap[saleEmpId]||'';
+      const empKey=saleEmpId||billNo;
+      if(empKey){
+        if(!byEmp[empKey])byEmp[empKey]={name:saleName,nameFromSales:true,branch:billMatch.branch||branch,agreed:0,evaluated:0};
+        else if(saleName) byEmp[empKey].name=saleName;
+        byEmp[empKey].agreed++;
+        if(ym){
+          if(!byEmpYm[empKey])byEmpYm[empKey]={};
+          if(!byEmpYm[empKey][ym])byEmpYm[empKey][ym]={agreed:0,evaluated:0};
+          byEmpYm[empKey][ym].agreed++;
+        }
+      }
+    }
+    if(empId&&ym){
+      if(!byEmpYm[empId])byEmpYm[empId]={};
+      if(!byEmpYm[empId][ym])byEmpYm[empId][ym]={agreed:0,evaluated:0};
+      byEmpYm[empId][ym].evaluated++;
     }
   });
-  return {summary,byEmp};
+  return {summary,byEmp,tradeByYm,byEmpYm};
 }
 
 async function processFiles(){
@@ -822,28 +1063,12 @@ async function processFiles(){
   document.getElementById('loading').classList.remove('hidden');
   _normCache.clear(); _matchCache.clear(); _branchLookup=null; _branchLookupKeys=null;
   try{
-    document.getElementById('loading-msg').textContent='กำลังอ่านไฟล์ทั้งหมด…';
-    let tRows;
-    if(TRADE_API_MODE){
-      // Hybrid mode: fetch trade rows from API (no file needed)
-      document.getElementById('loading-msg').textContent='กำลังดึงข้อมูลเทรดจาก API…';
-      const apiResp = await fetch('/api/import/trade-rows');
-      if(!apiResp.ok) throw new Error(`API trade-rows error: ${apiResp.status}`);
-      const apiData = await apiResp.json();
-      tRows = apiData.rows || [];
-    } else if(fileTrade.length > 0){
-      const tradeFileRows = await Promise.all(fileTrade.map(readXlsx));
-      const tradeFormat0 = detectTradeFormat(tradeFileRows[0] || []);
-      tRows = tradeFormat0 === 'search' ? tradeFileRows.flat() : tradeFileRows[0] || [];
-    } else {
-      // ไม่มีข้อมูลเทรด (Vercel mode / sales-only) → ใช้อาร์เรย์ว่าง
-      tRows = [];
-    }
+    document.getElementById('loading-msg').textContent='กำลังอ่านไฟล์ยอดขาย…';
     const [sRows, asmRows] = await Promise.all([
       Promise.all(fileSales.map(readXlsx)).then(arrs => arrs.flat()),
       fileASM ? readXlsx(fileASM) : Promise.resolve(null)
     ]);
-    document.getElementById('loading-msg').textContent='กำลังประมวลผลข้อมูล…';
+    document.getElementById('loading-msg').textContent='กำลังวิเคราะห์ช่วงวันที่และสาขาจากไฟล์ขาย…';
 
     const sS=sRows[0]||{};
     const kBranch  =findCol(sS,['Branch (Name)','Branch']);
@@ -852,15 +1077,24 @@ async function processFiles(){
     const kPType =findCol(sS,['Product Type']);
     const kQty   =findCol(sS,['Number','Qty','Quantity']);
     const kOff    =findCol(sS,['Officer (ID)','OfficerID']);
-    const kOffName=findCol(sS,['Officer (Name)','OfficerName','Officer Name']);
+    // ชื่อพนักงานจากคอลัมน์ AR (Officer (Name)) ตามไฟล์ยอดขาย 52_april
+    const kOffName=salesColByLetter(sS,'AR')||findCol(sS,['Officer (Name)','OfficerName','Officer Name']);
     const kDate   =findCol(sS,['Doc Date','DocDate','Date','วันที่']);
-    const sBillCol=Object.keys(sS)[16]??null;
+    const sBillCol=salesColByLetter(sS,'Q')||findCol(sS,['Document No','Doc No','Invoice','เลขบิล'])||Object.keys(sS)[16]||null;
 
     // === SINGLE PASS: empNameMap + salesBranchIdMap + dates + salesByBranch + salesByEmp + billToEmp ===
     const empNameMap={}, salesBranchIdMap={}, activeMths=new Set(), activeDates=new Set();
-    const salesByBranch={}, salesByEmp={}, salesEmpBranch={}, billToEmp={};
+    const salesByBranch={}, salesByEmp={}, salesEmpBranch={}, billToEmp={}, salesBillSet=new Set();
+    const billMetaByBill={}; // {bill:{hasDevice,hasAccessory,deviceQty,accessoryQty}}
     const salesByBranchYm={}; // {branch:{ym:{mac,ipad,iphone,watch}}} for month filter
     const salesByEmpYm={};   // {empId:{ym:{mac,ipad,iphone,watch}}} for date range filter
+    function classifyBillItem(row){
+      var ptype=s(row[kPType]);
+      var cat=s(row[kCat]);
+      var dev=CAT_DEV[cat];
+      var isAccessory=/accessory/i.test(cat)||/accessory/i.test(ptype)||/อุปกรณ์เสริม/i.test(cat)||/อุปกรณ์เสริม/i.test(ptype);
+      return {dev:dev,isAccessory:isAccessory};
+    }
     sRows.forEach(r=>{
       const raw=s(r[kDate]);
       let rowYm=null;
@@ -882,14 +1116,37 @@ async function processFiles(){
         const _bn=shortBranch(s(r[kBranch]));
         if(_bn&&_bn!=='Unknown')salesBranchIdMap[_bid]=_bn;
       }
-      if(r[kPType]!=='Inventory Item')return;
       const bid=_bid;
       const branch=(bid&&bid!=='0'&&salesBranchIdMap[bid])?salesBranchIdMap[bid]:shortBranch(s(r[kBranch]));
-      if(sBillCol&&oid){
-        const bill=s(r[sBillCol]);
-        if(bill&&!billToEmp[bill])
-          billToEmp[bill]={empId:oid,name:empNameMap[oid]||s(r[kOffName]||''),branch};
+      // เลขบิลจากทุกแถวในไฟล์ขาย (ไม่จำกัดแค่ Inventory Item) สำหรับจับคู่ตกลงเทรด
+      if(sBillCol){
+        const bill=normBill(r[sBillCol]);
+        if(bill){
+          addSalesBill(salesBillSet,bill);
+          const itemInfo=classifyBillItem(r);
+          if(!billMetaByBill[bill]) billMetaByBill[bill]={hasDevice:false,hasAccessory:false,deviceQty:0,accessoryQty:0};
+          if(itemInfo.isAccessory) billMetaByBill[bill].hasAccessory=true;
+          if(itemInfo.dev){
+            billMetaByBill[bill].hasDevice=true;
+            billMetaByBill[bill].deviceQty += Math.max(0, Number(r[kQty])||0);
+          }
+          if(itemInfo.isAccessory){
+            billMetaByBill[bill].accessoryQty += Math.max(0, Number(r[kQty])||0);
+          }
+          const nm=s(r[kOffName])||'';
+          const prev=billToEmp[bill];
+          if(!prev){
+            billToEmp[bill]={empId:oid||'',name:nm,branch};
+          } else {
+            if(oid) prev.empId=oid;
+            if(nm) prev.name=nm;
+          }
+          var stripped=bill.replace(/^0+/,'');
+          if(stripped&&stripped!==bill) billToEmp[stripped]=billToEmp[bill];
+          if(stripped&&stripped!==bill) billMetaByBill[stripped]=billMetaByBill[bill];
+        }
       }
+      if(r[kPType]!=='Inventory Item')return;
       const qty=Number(r[kQty])||0; if(qty<=0)return;
       const dev=CAT_DEV[s(r[kCat])]; if(!dev)return;
       if(!salesByBranch[branch])salesByBranch[branch]={};
@@ -911,27 +1168,58 @@ async function processFiles(){
       if(!salesEmpBranch[oid])salesEmpBranch[oid]=(bid&&bid!=='0'&&salesBranchIdMap[bid])?salesBranchIdMap[bid]:branch;
     });
 
-    const THAI_MTH=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     const salesKeys=Object.keys(salesByBranch);
+    const salesBranchCount=salesKeys.length;
+    var branchParam=branchParamFromSalesMap(salesBranchIdMap);
+    var branchIds=branchParam?branchParam.split(',').length:0;
+    document.getElementById('loading-msg').textContent='กำลังดึงข้อมูลเทรดจาก API'
+      +(branchIds?' (สาขา '+branchIds+' แห่ง)':'')
+      +' · ช่วงวันที่ในไฟล์ขาย…';
+    var isoRange=isoDateRangeFromSalesActiveDates(activeDates);
+    var limitStr=isoRange?tradeApiLimitForIsoRange(isoRange.start, isoRange.end):'50000';
+    var trades=await fetchTradeApiRows(isoRange&&isoRange.start, isoRange&&isoRange.end, limitStr, branchParam);
+    var apiFetched=trades.length;
+    trades=filterTradesForSalesScope(trades,salesBranchIdMap,salesKeys);
+    var tRows=mapTradeApiToRows(trades);
+    TRADE_API_INFO={rowCount:tRows.length,apiFetched:apiFetched,salesBranches:salesBranchCount,branchFilter:!!branchParam};
+    const tradeFormat0='search';
+    const tradeFileRows=[];
+
+    const THAI_MTH=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     const tradeFormat=tradeFormat0;
-    let tradeSummary={}, byEmpTrade={};
-    // คอลัม IT (index 253, 0-based) ในไฟล์เทรด = เลขที่บิลขาย สำหรับ lookup billToEmp
+    let tradeSummary={}, byEmpTrade={}, tradeByYm={}, byEmpYm={};
+    // เลขบิลขาย → lookup billToEmp จากคอลัมน์ Q ของไฟล์ยอดขาย
     const tKeys=tRows.length>0?Object.keys(tRows[0]):[];
-    const tBillCol=tKeys.length>253?tKeys[253]:null;
+    let tBillCol=tKeys.length>253?tKeys[253]:null;
+    if(!tBillCol&&tKeys.includes('invoice_no'))tBillCol='invoice_no';
+
+    // เติม salesBranchIdMap จาก API ก่อน parse (เดิมทำหลัง parse ทำให้ยอดตกลงไม่ตรง)
+    if(tradeFormat==='search'){
+      tRows.forEach(r=>{
+        const rawCode=s(r['branch_code']||'');
+        const branchId=rawCode?String(parseInt(rawCode,10)||0):'';
+        if(!branchId||branchId==='0'||salesBranchIdMap[branchId])return;
+        const rawName=s(r['ชื่อสาขา']||r['BRANCH_NAME']||'');
+        if(!rawName)return;
+        const bn=shortBranch(rawName);
+        const canonical=salesKeys.includes(bn)?bn:(matchBranch(bn,salesKeys)||bn);
+        if(canonical&&canonical!=='Unknown')salesBranchIdMap[branchId]=canonical;
+      });
+    }
 
     if(tradeFormat==='search'){
-      // activeDates สร้างแล้วใน PASS 1 — ใช้ได้เลย
-      // กรองตามวันที่ขาย Device; ถ้าไม่มี overlap ให้ fallback แสดงข้อมูลทั้งหมด
-      let result=parseTradeSearch(tRows,activeDates,salesKeys,empNameMap,salesBranchIdMap,billToEmp,tBillCol);
+      const tradeActiveDates=expandActiveDatesHull(activeDates);
+      let result=parseTradeSearch(tRows,tradeActiveDates,salesKeys,empNameMap,salesBranchIdMap,billToEmp,salesBillSet,tBillCol);
       const totalFiltered=Object.values(result.summary).reduce((s,v)=>s+v.evaluated,0);
       let dateFiltered=true;
-      if(totalFiltered===0&&activeDates.size>0){
-        // ไม่มี overlap — fallback แสดงข้อมูลทั้งหมดในไฟล์เทรด
-        result=parseTradeSearch(tRows,new Set(),salesKeys,empNameMap,salesBranchIdMap,billToEmp,tBillCol);
+      if(totalFiltered===0&&tradeActiveDates.size>0){
+        result=parseTradeSearch(tRows,new Set(),salesKeys,empNameMap,salesBranchIdMap,billToEmp,salesBillSet,tBillCol);
         dateFiltered=false;
       }
       tradeSummary=result.summary;
       byEmpTrade=result.byEmp;
+      tradeByYm=result.tradeByYm;
+      byEmpYm=result.byEmpYm;
 
       // Build date badges
       const sdArr=[...activeDates].sort();
@@ -982,23 +1270,6 @@ async function processFiles(){
     // IDs จาก sales file เท่านั้น (ใช้เป็น priority ใน parseASMFile เมื่อ key ซ้ำ)
     const salesFileIds=new Set(Object.keys(salesBranchIdMap));
 
-    // === PASS 2.5: Augment salesBranchIdMap จากไฟล์ trade (column branch_code + ชื่อสาขา) ===
-    // ใช้เป็น backup กรณี sales file ไม่มี Branch (ID) หรือ mapping พลาด
-    // ตัด leading zeros ด้วย parseInt (เช่น '02919' → 2919)
-    if(tradeFormat==='search'){
-      tRows.forEach(r=>{
-        const rawCode=s(r['branch_code']||'');
-        const branchId=rawCode?String(parseInt(rawCode,10)||0):'';
-        if(!branchId||branchId==='0'||salesBranchIdMap[branchId])return; // มีแล้วไม่ overwrite
-        const rawName=s(r['ชื่อสาขา']||r['BRANCH_NAME']||'');
-        if(!rawName)return;
-        const bn=shortBranch(rawName);
-        // ถ้า bn ไม่อยู่ใน salesKeys ให้ fuzzy match ก่อน
-        const canonical=salesKeys.includes(bn)?bn:(matchBranch(bn,salesKeys)||bn);
-        if(canonical&&canonical!=='Unknown')salesBranchIdMap[branchId]=canonical;
-      });
-    }
-
     // Parse ASM mapping file if provided (optional ไฟล์ 3)
     let branchAMRM={}, hasAMRM=false;
     if(asmRows){
@@ -1019,54 +1290,7 @@ async function processFiles(){
     RAW_TRADE_ROWS = tRows;
     SALES_COL_KEYS = { kCat, kPType, kQty, kDate };
 
-    // === Build tradeByYm {branch:{ym:{agreed,evaluated}}} for month filter ===
-    // ตกลงเทรด = สิ้นสุดการประเมินราคา (5) เท่านั้น
-    const AGREED_ST_YM=new Set([5]);
-    const THAI_ST_YM={'สิ้นสุดการประเมินราคา':5,'ยืนยันราคาแล้ว':7,'ยกเลิกรายการ':6,'รอผู้ขายยืนยันราคา':3,'รอการประเมินราคา':1,'อยู่ระหว่างผู้รับซื้อให้ราคา':2,'กำลังสร้างเอกสาร':4};
-    const tradeByYm={};
-    const byEmpYm={};  // {empId:{ym:{agreed,evaluated}}} for date range filter
-    if(tradeFormat==='search'){
-      // derive from raw transaction rows — ไม่ filter ตามวันที่ (เพื่อให้ครบทุกสาขา ทุกเดือน)
-      tRows.forEach(r=>{
-        let branch;
-        // branch matching (เหมือน parseTradeSearch: รองรับ "ID<n> ชื่อ" + real_branch_id)
-        let _rb=s(r['ชื่อสาขา']||r['BRANCH_NAME']||'');
-        let _exId=''; const _idNoCm=_rb.match(/^ID(\d+)\s+(.+)/i); if(_idNoCm){_exId=_idNoCm[1];_rb=_idNoCm[2];}
-        const _rc=s(r['branch_code']||r['real_branch_id']||r['รหัสสาขา']||r['BRANCH_ID']||_exId||'');
-        const _bid=_rc?String(parseInt(_rc,10)||0):'';
-        if(_bid&&_bid!=='0'&&salesBranchIdMap[_bid]){
-          branch=salesBranchIdMap[_bid];
-        } else {
-          if(!_rb)return;
-          const nm=matchBranch(_rb,salesKeys);
-          branch=(nm&&nm!==_rb)?nm:_rb;
-        }
-        // date: รองรับทั้ง ISO YYYY-MM-DD และ DD/MM/YYYY
-        let _td=s(r['วันที่คำสั่งเทรด']||'');
-        const _isoM=_td.match(/^(\d{4})-(\d{2})-(\d{2})$/); if(_isoM)_td=`${_isoM[3]}/${_isoM[2]}/${_isoM[1]}`;
-        const tm=_td.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-        if(!tm)return;
-        const ceY=parseInt(tm[3])>2100?parseInt(tm[3])-543:parseInt(tm[3]);
-        const mn=parseInt(tm[2]); if(mn<1||mn>12)return;
-        const ym=`${ceY}-${String(mn).padStart(2,'0')}`;
-        if(!tradeByYm[branch])tradeByYm[branch]={};
-        if(!tradeByYm[branch][ym])tradeByYm[branch][ym]={agreed:0,evaluated:0};
-        tradeByYm[branch][ym].evaluated++;
-        // status: BIDDING_STATUS (numeric) → fallback สถานะ (Thai text)
-        let _bst=0;
-        if(r['BIDDING_STATUS']!=null&&r['BIDDING_STATUS']!==''){_bst=Number(r['BIDDING_STATUS'])||0;}
-        else{_bst=THAI_ST_YM[s(r['สถานะ']||'')]||0;}
-        if(AGREED_ST_YM.has(_bst))tradeByYm[branch][ym].agreed++;
-        // ติดตาม per-employee per-YM (ใช้ emp ID จากไฟล์ trade โดยตรง)
-        const _eid=s(r['รหัสพนักงานขาย']||'');
-        if(_eid){
-          if(!byEmpYm[_eid])byEmpYm[_eid]={};
-          if(!byEmpYm[_eid][ym])byEmpYm[_eid][ym]={agreed:0,evaluated:0};
-          byEmpYm[_eid][ym].evaluated++;
-          if(AGREED_ST_YM.has(_bst))byEmpYm[_eid][ym].agreed++;
-        }
-      });
-    } else {
+    if(tradeFormat!=='search'){
       // report format: use byMonth; infer year from salesByBranchYm keys
       const ymKeys=Object.values(salesByBranchYm).flatMap(b=>Object.keys(b));
       const inferYear=ymKeys.length?ymKeys.sort()[0].slice(0,4):String(new Date().getFullYear());
@@ -1100,8 +1324,19 @@ async function processFiles(){
       emp_branch:salesEmpBranch,
       branch_amrm:branchAMRM,
       has_amrm:hasAMRM,
-      all_branch_names:allBranchNames
+      all_branch_names:allBranchNames,
+      sales_bill_ids:[...salesBillSet],
+      bill_to_emp:billToEmp,
+      bill_meta_by_bill:billMetaByBill,
+      t_bill_col:tBillCol
     };
+    var apiInfo=document.getElementById('trade-api-info');
+    if(apiInfo&&TRADE_API_INFO){
+      var msg=TRADE_API_INFO.rowCount.toLocaleString()+' รายการ';
+      if(TRADE_API_INFO.branchFilter) msg+=' · กรองสาขาใน API ('+TRADE_API_INFO.salesBranches+' สาขา)';
+      else msg+=' · ดึงจาก API '+TRADE_API_INFO.apiFetched.toLocaleString()+' รายการ';
+      apiInfo.textContent=msg;
+    }
     showDashboard();
   }catch(err){
     document.getElementById('loading').classList.add('hidden');
@@ -1242,23 +1477,18 @@ function resetAMRM(){
 }
 
 function resetDashboard(){
-  DATA=null; fileSales=[]; fileTrade=[]; fileASM=null; DATA_MONTHS='';
+  DATA=null; fileSales=[]; fileASM=null; DATA_MONTHS='';
   RAW_SALES_ROWS=[]; RAW_TRADE_ROWS=[]; SALES_COL_KEYS=null;
   DATE_RANGE_START=null; DATE_RANGE_END=null;
-  TRADE_API_MODE=false; TRADE_API_INFO=null;
+  TRADE_API_INFO=null;
   document.getElementById('dashboard-screen').classList.add('hidden');
   document.getElementById('upload-screen').classList.remove('hidden');
   document.getElementById('process-btn').classList.add('hidden');
-  ['input-sales','input-trade','input-asm'].forEach(id=>{ document.getElementById(id).value=''; });
-  ['sales-file-list','trade-file-list','sales-add-btn','trade-add-btn','asm-filename'].forEach(id=>{ document.getElementById(id)?.classList.add('hidden'); });
-  // reset trade API card state
-  document.getElementById('trade-api-card').classList.add('hidden');
-  const wrap=document.getElementById('drop-trade-wrap');
-  wrap.classList.remove('opacity-30','pointer-events-none');
+  ['input-sales','input-asm'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  ['sales-file-list','sales-add-btn','asm-filename'].forEach(id=>{ document.getElementById(id)?.classList.add('hidden'); });
   DEV_KEYS.forEach(d=>{ document.getElementById('dev-'+d).checked=true; });
   updateChips();
-  // re-check API trade availability
-  initTradeApiCard();
+  setTradeApiCardIdle();
 }
 
 // ===== TAB VIEW =====
@@ -1957,20 +2187,26 @@ function renderEmpSummary(devs, amrmBranches){
 
   EMP_PAGE_DEVS=devs;
   EMP_CUR_PAGE=0;
-  EMP_LIST_CACHE=Object.keys(DATA.sales_by_emp).map(empId=>{
+  var empIds=new Set();
+  Object.keys(DATA.sales_by_emp||{}).forEach(function(id){ empIds.add(String(id)); });
+  Object.keys(DATA.by_emp||{}).forEach(function(id){ empIds.add(String(id)); });
+  EMP_LIST_CACHE=[...empIds].map(function(empId){
     const branch=DATA.by_emp[empId]?.branch||DATA.emp_branch[empId]||'Unknown';
     if(amrmBranches&&!amrmBranches.has(branch))return null;
     const name=DATA.by_emp[empId]?.name||DATA.emp_names[empId]||empId;
     const perDev={};
     devs.forEach(d=>{ perDev[d]=sumEmpSales(empId,[d]); });
     const devSold=devs.reduce((s,d)=>s+perDev[d],0);
-    const {agreed,evaluated}=sumEmpTrade(empId);
+    const trade=sumEmpTrade(empId);
+    const agreed=trade.agreed, evaluated=trade.evaluated, notAgreed=trade.not_agreed||0;
+    // ถ้าไม่มีชื่อจากฝั่งยอดขาย/เทรด ให้ยังโชว์ไว้ก่อนเพื่อไม่ให้รายชื่อหายไปหมด
+    if(!name&&devSold<=0&&evaluated<=0)return null;
     const attP=pct(agreed,devSold);
-    return{empId,name,branch,perDev,devSold,evaluated,agreed,attP};
+    return{empId,name,branch,perDev,devSold,evaluated,agreed,notAgreed,attP};
   }).filter(Boolean).sort((a,b)=>b.attP-a.attP||b.agreed-a.agreed||b.devSold-a.devSold);
 
   if(EMP_LIST_CACHE.length===0){
-    wrap.innerHTML='<div class="py-14 text-center text-gray-400 text-sm">ไม่มีข้อมูลพนักงานในช่วงที่เลือก</div>';
+    wrap.innerHTML='<div class="py-14 text-center text-gray-400 text-sm">ไม่มีพนักงานที่มียอดขายและยอดเทรดในช่วงที่เลือก</div>';
     return;
   }
   renderEmpPage(0);
@@ -2014,7 +2250,7 @@ function renderEmpPage(page){
       </td>
       ${devCells}
       <td class="px-1 py-2 text-center text-sm font-bold text-[#9E7A3F]">${e.devSold||'–'}</td>
-      <td class="px-1 py-2 text-center text-sm font-semibold text-gray-500">${e.evaluated||'–'}</td>
+      <td class="px-1 py-2 text-center text-sm font-semibold text-gray-500" title="${e.notAgreed>0?'ยังไม่ตกลง '+e.notAgreed+' รายการ':''}">${e.evaluated||'–'}</td>
       <td class="px-1 py-2 text-center text-base font-black text-emerald-600">${e.agreed}</td>
       <td class="px-1 py-2 min-w-[90px]">
         <div class="flex items-center gap-1">
@@ -2275,16 +2511,66 @@ function sumEmpSales(empId,devs){
   }
   return devs.reduce((s,d)=>s+active.reduce((sum,ym)=>sum+(DATA.sales_by_emp_ym?.[id]?.[ym]?.[d]||0),0),0);
 }
+function tradeRowInActiveRange(r){
+  const active=getActiveYMs();
+  const all=DATA?.available_yms||[];
+  if(!DATE_RANGE_START&&!DATE_RANGE_END&&active.length===all.length) return true;
+  const ym=tradeRowYm(r);
+  return !!(ym&&active.indexOf(ym)>=0);
+}
+function getBillMetaByBill(billNo){
+  const billMetaByBill=DATA?.bill_meta_by_bill||{};
+  return billMetaByBill[billNo]||null;
+}
+function billEmpIdForTradeRow(r){
+  const billToEmp=DATA?.bill_to_emp||{};
+  const tBillCol=DATA?.t_bill_col||'invoice_no';
+  const cands=tradeBillCandidates(r,tBillCol);
+  for(var i=0;i<cands.length;i++){
+    var m=billToEmp[cands[i]];
+    if(m&&m.empId) return String(m.empId);
+  }
+  return '';
+}
+/**
+ * ประเมิน = แถว trade ที่รหัส API หรือบิลขายชี้พนักงานนี้
+ * ตกลง = เลขบิลตรงไฟล์ขาย + พนักงานจากบิลขาย (คอลัม AR) เท่านั้น
+ */
+function calcEmpTradeStats(empId){
+  const id=String(empId);
+  const salesBillSet=new Set(DATA?.sales_bill_ids||[]);
+  const tBillCol=DATA?.t_bill_col||'invoice_no';
+  var evaluated=0, agreed=0;
+  (RAW_TRADE_ROWS||[]).forEach(function(r){
+    if(!tradeRowInActiveRange(r)) return;
+    var apiEmp=resolveTradeEmpId(r, DATA?.emp_names||{}, getBillMetaByBill(tradeBillCandidates(r, DATA?.t_bill_col||'invoice_no')[0]||''));
+    var billEmp=billEmpIdForTradeRow(r);
+
+    // ประเมิน = ทุกแถวที่ระบุพนักงานคนนี้จาก trade API หรือ resolve จาก supersale
+    if(apiEmp===id || billEmp===id) evaluated++;
+
+    // ตกลง = เฉพาะแถวที่ผูกได้ทั้งบิลขาย + พนักงานจากไฟล์ขาย + สถานะตกลงจริง
+    if(billEmp===id && isAgreedTrade(r,salesBillSet,tBillCol)) agreed++;
+  });
+  return{agreed:agreed,evaluated:evaluated,not_agreed:Math.max(0,evaluated-agreed)};
+}
 function sumEmpTrade(empId){
+  if(RAW_TRADE_ROWS&&RAW_TRADE_ROWS.length&&DATA) return calcEmpTradeStats(empId);
   const id=String(empId);
   const active=getActiveYMs();
   const all=DATA?.available_yms||[];
   if(!DATE_RANGE_START&&!DATE_RANGE_END&&active.length===all.length){
-    const t=DATA.by_emp[id]||{agreed:0,evaluated:0}; return{agreed:t.agreed,evaluated:t.evaluated};
+    const t=DATA.by_emp[id]||{agreed:0,evaluated:0}; return{agreed:t.agreed,evaluated:t.evaluated,not_agreed:(t.evaluated||0)-(t.agreed||0)};
   }
   let agreed=0,evaluated=0;
   active.forEach(ym=>{const t=DATA.by_emp_ym?.[id]?.[ym]||{};agreed+=(t.agreed||0);evaluated+=(t.evaluated||0);});
-  return{agreed,evaluated};
+  // fallback: ถ้าไม่มีข้อมูลช่วงวันที่ แต่มีพนักงานใน by_emp ให้ยังมีชื่อแสดง
+  if(evaluated===0&&agreed===0&&DATA?.by_emp?.[id]){
+    const t=DATA.by_emp[id]||{agreed:0,evaluated:0};
+    agreed=t.agreed||0;
+    evaluated=t.evaluated||0;
+  }
+  return{agreed,evaluated,not_agreed:evaluated-agreed};
 }
 function sumAllTrades(b){
   const active=getActiveYMs();

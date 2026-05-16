@@ -4,6 +4,12 @@
   "functions": {
     "api/trade-analysis.js": {
       "maxDuration": 60
+    },
+    "api/trade-rows.js": {
+      "maxDuration": 60
+    },
+    "api/trade-stats.js": {
+      "maxDuration": 30
     }
   },
   "headers": [
