@@ -1,8 +1,5 @@
 {
   "name": "studio7-trade-dashboard",
   "version": "1.0.0",
-  "private": true,
-  "dependencies": {
-    "pg": "^8.13.3"
-  }
+  "private": true
 }
