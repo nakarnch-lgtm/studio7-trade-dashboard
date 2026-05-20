@@ -1,18 +1,7 @@
-var { Pool } = require('pg');
-
-var pool;
-function getPool() {
-  if (!pool) {
-    pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('localhost')
-        ? false
-        : { rejectUnauthorized: false }
-    });
-  }
-  return pool;
-}
-
+/**
+ * Adapter: proxy TechTrade GET /api/v2/trades
+ * แปลง { count, data } → { rows, rowCount, dateRange } ที่ dashboard คาดหวัง
+ */
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -21,29 +10,35 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  if (!process.env.DATABASE_URL) {
-    return res.status(503).json({ error: 'DATABASE_URL not configured' });
-  }
-
   try {
-    var client = await getPool().connect();
-    try {
-      var result = await client.query(
-        'SELECT raw_row, doc_date FROM trade_rows ORDER BY doc_date'
-      );
-      var rows = result.rows;
-      return res.json({
-        rows: rows.map(function(r) { return r.raw_row; }),
-        rowCount: rows.length,
-        dateRange: rows.length
-          ? { from: rows[0].doc_date, to: rows[rows.length - 1].doc_date }
-          : null
-      });
-    } finally {
-      client.release();
+    var apiKey = process.env.REPORT_TRADE_API_KEY || process.env.TECHTRADE_API_KEY || 'techtrade_pro_secret_2026';
+    var target = new URL('https://report-trade.vercel.app/api/v2/trades');
+
+    var host = req.headers.host || 'localhost';
+    var urlObj = new URL(req.url || '/', 'http://' + host);
+    var params = urlObj.searchParams;
+    ['zone', 'branch', 'start_date', 'end_date', 'limit'].forEach(function(k) {
+      if (params.has(k)) target.searchParams.set(k, params.get(k));
+    });
+
+    var upstream = await fetch(target.toString(), {
+      headers: { 'X-API-Key': apiKey, Accept: 'application/json' }
+    });
+
+    if (!upstream.ok) {
+      return res.status(upstream.status).json({ error: 'Upstream error: ' + upstream.status });
     }
+
+    var data = await upstream.json();
+    var rows = data.data || [];
+    var rowCount = typeof data.count === 'number' ? data.count : rows.length;
+
+    var dates = rows.map(function(r) { return r.document_date; }).filter(Boolean).sort();
+    var dateRange = dates.length ? { from: dates[0], to: dates[dates.length - 1] } : null;
+
+    return res.json({ rows: rows, rowCount: rowCount, dateRange: dateRange });
   } catch (err) {
-    console.error('trade-rows error:', err.message);
-    return res.status(500).json({ error: err.message || 'DB error' });
+    console.error('trade-rows proxy error:', err.message);
+    return res.status(500).json({ error: err.message || 'proxy error' });
   }
 };
