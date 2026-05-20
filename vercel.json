@@ -5,11 +5,8 @@
     "api/trade-analysis.js": {
       "maxDuration": 60
     },
-    "api/trade-rows.js": {
-      "maxDuration": 60
-    },
-    "api/trade-stats.js": {
-      "maxDuration": 30
+    "api/import/trade-rows.js": {
+      "maxDuration": 10
     }
   },
   "headers": [
